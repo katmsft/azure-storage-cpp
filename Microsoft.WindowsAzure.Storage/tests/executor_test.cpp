@@ -21,6 +21,13 @@
 
 SUITE(Core)
 {
+    TEST_FIXTURE(test_base, custom_memory_allocator)
+    {
+        azure::storage::core::dummy_singleton::instance();
+        azure::storage::core::dummy_lazy_singleton::instance();
+        azure::storage::core::dummy_static_func_singleton::instance();
+    }
+
     TEST_FIXTURE(test_base, timeout)
     {
         azure::storage::cloud_blob_client client = test_config::instance().account().create_cloud_blob_client();

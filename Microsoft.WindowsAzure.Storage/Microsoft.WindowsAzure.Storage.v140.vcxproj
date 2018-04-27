@@ -162,6 +162,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="includes\wascore\filestream.h" />
+    <ClInclude Include="includes\wascore\memory.h" />
     <ClInclude Include="includes\wascore\protocol_json.h" />
     <ClInclude Include="includes\was\auth.h" />
     <ClInclude Include="includes\was\blob.h" />
@@ -227,6 +228,7 @@
     <ClCompile Include="src\file_response_parsers.cpp" />
     <ClCompile Include="src\hashing.cpp" />
     <ClCompile Include="src\logging.cpp" />
+    <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\mime_multipart_helper.cpp" />
     <ClCompile Include="src\operation_context.cpp" />
     <ClCompile Include="src\protocol_json.cpp" />

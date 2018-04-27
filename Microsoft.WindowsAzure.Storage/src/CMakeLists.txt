@@ -28,6 +28,7 @@ if(UNIX)
      logging.cpp
      hashing.cpp
      constants.cpp
+     memory.cpp
      streams.cpp
      cloud_file_ostreambuf.cpp
      cloud_file.cpp

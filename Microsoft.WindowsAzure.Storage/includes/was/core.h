@@ -20,6 +20,7 @@
 #include "cpprest/http_client.h"
 
 #include "wascore/basic_types.h"
+#include "wascore/memory.h"
 #include "wascore/constants.h"
 
 #pragma push_macro("max")
