@@ -2541,6 +2541,7 @@ namespace azure { namespace storage {
                 m_maximum_execution_time = std::move(other.m_maximum_execution_time);
                 m_location_mode = std::move(other.m_location_mode);
                 m_http_buffer_size = std::move(other.m_http_buffer_size);
+                m_do_validate_certificate = other.m_do_validate_certificate;
             }
             return *this;
         }
@@ -2661,6 +2662,25 @@ namespace azure { namespace storage {
             return m_operation_expiry_time;
         }
 
+        /// <summary>
+        /// Gets if the SSL certificate is going to be validated for HTTPS requests.
+        /// </summary>
+        /// <returns>True if SSL certificate is going to be validated, false otherwise</returns>
+        /// </remarks>
+        bool validate_certificates() const
+        {
+            return m_validate_certificates;
+        }
+
+        /// <summary>
+        /// Sets if the SSL certificate is going to be validated for HTTPS requests.
+        /// </summary>
+        /// <param name="validate_certificate">If the SSL certificate is going to be validated for HTTPS requests</param>
+        void set_validate_certificates(bool validate_certificates)
+        {
+            m_validate_certificates = validate_certificates;
+        }
+
     protected:
 
         /// <summary>
@@ -2686,6 +2706,7 @@ namespace azure { namespace storage {
             m_maximum_execution_time.merge(other.m_maximum_execution_time);
             m_location_mode.merge(other.m_location_mode);
             m_http_buffer_size.merge(other.m_http_buffer_size);
+            m_validate_certificates.merge(other.m_validate_certificates);
 
             if (apply_expiry)
             {
@@ -2702,7 +2723,7 @@ namespace azure { namespace storage {
         }
 
     private:
-
+        option_with_default<bool> m_validate_certificates;
         utility::datetime m_operation_expiry_time;
         azure::storage::retry_policy m_retry_policy;
         option_with_default<std::chrono::seconds> m_noactivity_timeout;

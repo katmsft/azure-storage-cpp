@@ -1032,4 +1032,93 @@ SUITE(Blob)
         CHECK_THROW(blob.download_text(condition, azure::storage::blob_request_options(), context), azure::storage::storage_exception);
         CHECK_EQUAL(web::http::status_codes::BadRequest, context.request_results().back().http_status_code());
     }
+
+    ///// <summary>
+    ///// Test ip download
+    ///// </summary>
+    //TEST_FIXTURE(blob_test_base, ip_download)
+    //{
+    //    // download blob smaller than 32MB.
+    //    {
+    //        //auto container_name = get_random_string(20);
+    //        //auto container = m_client.get_container_reference(container_name);
+    //        //std::wcout << "container name is " << container_name << std::endl;
+    //        //container.create_if_not_exists();
+    //        //auto blob_name = get_random_string(20);
+    //        //auto blob = container.get_block_blob_reference(blob_name);
+    //        //std::wcout << "blob_name name is " << blob_name << std::endl;
+    //        //size_t target_length = 4 * 1024 * 1024;
+    //        //azure::storage::blob_request_options option;
+    //        //std::vector<uint8_t> data;
+    //        //data.resize(target_length);
+    //        //for (size_t i = 0; i < target_length; ++i)
+    //        //{
+    //        //    data[i] = i % 255;
+    //        //}
+    //        //concurrency::streams::container_buffer<std::vector<uint8_t>> upload_buffer(data);
+    //        //blob.upload_from_stream(upload_buffer.create_istream(), azure::storage::access_condition(), option, m_context);
+
+    //        //auto account_ip = "52.239.129.4";
+    //        //// download target blob in parallel.
+    //        //azure::storage::operation_context context;
+    //        //concurrency::streams::container_buffer<std::vector<uint8_t>> download_buffer;
+    //        //blob.download_to_stream(download_buffer.create_ostream(), azure::storage::access_condition(), option, context);
+
+
+    //        //auto blob_uri = blob.uri().primary_uri().to_string();
+    //        //std::wcout << "blob URL is " << blob_uri << std::endl;
+
+    //        auto container_name = _XPLATSTR("72108696941501656016");
+    //        auto blob_name = _XPLATSTR("81164056505712291992");
+    //        auto blob_host = _XPLATSTR("tankstdcppt.blob.core.windows.net");
+    //        auto ip_host = _XPLATSTR("52.239.129.4");
+    //        azure::storage::blob_request_options option;
+
+    //        auto container = m_client.get_container_reference(container_name);
+    //        std::wcout << "container name is " << container_name << std::endl;
+    //        auto blob = container.get_block_blob_reference(blob_name);
+    //        std::wcout << "blob_name name is " << blob_name << std::endl;
+
+    //        azure::storage::operation_context context;
+    //        context.set_sending_request(
+    //            [this, blob_host](
+    //                __inout web::http::http_request& webRequest,
+    //                __in azure::storage::operation_context context)
+    //        {
+    //            webRequest.headers()[L"Host"] = blob_host;
+    //            std::wcout << "running sending request" << std::endl;
+    //            std::wcout << "printing headers" << std::endl;
+    //            int counter = 0;
+    //            for each (auto header in webRequest.headers())
+    //            {
+    //                std::wcout << "header " << counter++ << ":" << header.first << " : " << header.second << std::endl;
+    //            }
+    //        });
+    //        concurrency::streams::container_buffer<std::vector<uint8_t>> download_buffer;
+
+    //        azure::storage::blob_shared_access_policy policy;
+    //        policy.set_permissions(azure::storage::blob_shared_access_policy::permissions::read);
+    //        policy.set_start(utility::datetime::utc_now() - utility::datetime::from_minutes(5));
+    //        policy.set_expiry(utility::datetime::utc_now() + utility::datetime::from_minutes(1000));
+
+    //        azure::storage::cloud_blob_shared_access_headers headers;
+
+    //        auto sas_token = blob.get_shared_access_signature(policy, utility::string_t(), headers);
+    //        std::wcout << sas_token << std::endl;
+
+    //        azure::storage::storage_credentials credentials;
+    //        if (!sas_token.empty())
+    //        {
+    //            credentials = azure::storage::storage_credentials(sas_token);
+    //        }
+
+    //        auto path = utility::string_t(_XPLATSTR("https://")) + ip_host + _XPLATSTR("/") + container_name;
+    //        auto ip_uri = azure::storage::storage_uri(web::uri(path));
+
+    //        azure::storage::cloud_blob_container new_container(ip_uri, credentials);
+    //        azure::storage::cloud_blob new_blob = new_container.get_blob_reference(blob.name());
+
+    //        new_blob.download_to_stream(download_buffer.create_ostream(), azure::storage::access_condition(), option, context);
+    //    }
+    //}
 }

@@ -455,6 +455,8 @@ namespace azure { namespace storage { namespace core {
                     config.set_proxy(instance->m_context.proxy());
                 }
 
+                config.set_validate_certificates(instance->m_request_options.validate_certificates());
+
                 instance->remaining_time();
                 config.set_timeout(instance->m_request_options.noactivity_timeout());
 
