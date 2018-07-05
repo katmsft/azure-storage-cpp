@@ -173,8 +173,11 @@ namespace azure { namespace storage { namespace core {
         void close() override;
 
     private:
-
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
+        HMAC_CTX m_hash_context;
+#else
         HMAC_CTX* m_hash_context;
+#endif
     };
 
     class md5_hash_provider_impl : public cryptography_hash_provider_impl
@@ -186,7 +189,11 @@ namespace azure { namespace storage { namespace core {
         void close() override;
 
     private:
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
+        MD5_CTX m_hash_context;
+#else
         MD5_CTX* m_hash_context;
+#endif
     };
 
 #endif

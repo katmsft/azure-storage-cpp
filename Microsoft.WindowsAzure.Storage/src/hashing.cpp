@@ -107,31 +107,34 @@ namespace azure { namespace storage { namespace core {
 
     hmac_sha256_hash_provider_impl::hmac_sha256_hash_provider_impl(const std::vector<uint8_t>& key)
     {
-    #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
-        m_hash_context = (HMAC_CTX*) OPENSSL_malloc(sizeof(*m_hash_context));
-        memset(m_hash_context, 0, sizeof(*m_hash_context));
-        HMAC_CTX_init(m_hash_context);       
-    #else
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
+        HMAC_CTX_init(&m_hash_context);       
+        HMAC_Init_ex(&m_hash_context, &key[0], (int)key.size(), EVP_sha256(), NULL);
+#else
         m_hash_context = HMAC_CTX_new();
          HMAC_CTX_reset(m_hash_context);
-    #endif
-        HMAC_Init_ex(m_hash_context, &key[0], (int) key.size(), EVP_sha256(), NULL);
+         HMAC_Init_ex(m_hash_context, &key[0], (int)key.size(), EVP_sha256(), NULL);
+#endif
     }
 
     void hmac_sha256_hash_provider_impl::write(const uint8_t* data, size_t count)
     {   
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
+        HMAC_Update(&m_hash_context, data, count);
+#else
         HMAC_Update(m_hash_context, data, count);
+#endif
     }
 
     void hmac_sha256_hash_provider_impl::close()
     {
         unsigned int length = SHA256_DIGEST_LENGTH;
         m_hash.resize(length);
-        HMAC_Final(m_hash_context, &m_hash[0], &length);
     #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
-        HMAC_CTX_cleanup(m_hash_context);
-        OPENSSL_free(m_hash_context);
+        HMAC_Final(&m_hash_context, &m_hash[0], &length);
+        HMAC_CTX_cleanup(&m_hash_context);
     #else
+        HMAC_Final(m_hash_context, &m_hash[0], &length);
         HMAC_CTX_free(m_hash_context);
     #endif
 
@@ -139,21 +142,33 @@ namespace azure { namespace storage { namespace core {
 
     md5_hash_provider_impl::md5_hash_provider_impl()
     {
-        m_hash_context =(MD5_CTX*) OPENSSL_malloc(sizeof(MD5_CTX));
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
+        MD5_Init(&m_hash_context);
+#else
+        m_hash_context = (MD5_CTX*)OPENSSL_malloc(sizeof(MD5_CTX));
         memset(m_hash_context, 0, sizeof(*m_hash_context));
         MD5_Init(m_hash_context);
+#endif
     }
 
     void md5_hash_provider_impl::write(const uint8_t* data, size_t count)
     {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
+        MD5_Update(&m_hash_context, data, count);
+#else
         MD5_Update(m_hash_context, data, count);
+#endif
     }
 
     void md5_hash_provider_impl::close()
     {
         m_hash.resize(MD5_DIGEST_LENGTH);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined (LIBRESSL_VERSION_NUMBER)
+        MD5_Final(m_hash.data(), &m_hash_context);
+#else
         MD5_Final(m_hash.data(), m_hash_context);
         OPENSSL_free(m_hash_context);
+#endif
     }
 
 #endif
