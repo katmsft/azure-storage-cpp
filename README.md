@@ -78,7 +78,22 @@ Starting from version 2.1.0, Azure Storage Client Library for C++ supports Visua
 
 ### C++ REST SDK
 
-The Azure Storage Client Library for C++ depends on the C++ REST SDK (codename "Casablanca") 2.10.3. It can be installed through Vcpkg (vcpkg install cpprestsdk) or downloaded directly from [GitHub](https://github.com/Microsoft/cpprestsdk/releases/tag/v2.10.3).
+The Azure Storage Client Library for C++ depends on the C++ REST SDK (codename "Casablanca") It can be installed through Vcpkg (vcpkg install cpprestsdk) or downloaded directly from [GitHub](https://github.com/Microsoft/cpprestsdk/releases/).
+
+The dependency version can be found in the following chart:
+
+
+| azure-storage-cpp's version | Casablanca version for Windows | Casablanca version for Linux |
+|-----------------------------|--------------------------------|------------------------------|
+| 1.0.0                       | 2.4.0                          | 2.4.0                        |
+| 2.0.0                       | 2.4.0                          | 2.4.0                        |
+| 3.0.0                       | 2.9.1                          | 2.9.1                        |
+| 4.0.0                       | 2.9.1                          | 2.9.1                        |
+| 5.0.0                       | 2.9.1                          | 2.9.1                        |
+| 5.0.1                       | 2.9.1                          | 2.9.1                        |
+| 5.1.0                       | 2.10.4                         | 2.10.3                       |
+| 5.1.1                       | 2.10.4                         | 2.10.3                       |
+
 
 ## Code Samples
 
@@ -90,7 +105,7 @@ To get started with the coding, please visit the following articles:
 To accomplish specific tasks, please find the code samples at [samples folder](Microsoft.WindowsAzure.Storage/samples).
 
 ## Getting Started on Linux
-As mentioned above, the Azure Storage Client Library for C++ depends on Casablanca. Follow [these instructions](https://github.com/Microsoft/cpprestsdk/wiki/How-to-build-for-Linux) to compile it. Current version of the library depends on Casablanca version 2.10.3.
+As mentioned above, the Azure Storage Client Library for C++ depends on Casablanca. Follow [these instructions](https://github.com/Microsoft/cpprestsdk/wiki/How-to-build-for-Linux) to compile it.
 
 Once this is complete, then:
 
