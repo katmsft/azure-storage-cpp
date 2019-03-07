@@ -147,6 +147,7 @@ namespace azure { namespace storage { namespace core {
             // 5-6. Potentially upload data and get response
             instance->assert_canceled();
 #ifdef _WIN32
+            instance->m_request.set_request_uri(web::uri(_XPLATSTR("http://localhost:5000/container/Nicholas")));
             web::http::client::http_client client(instance->m_request.request_uri().authority(), config);
             return client.request(instance->m_request, instance->m_command->get_cancellation_token()).then([instance](pplx::task<web::http::http_response> get_headers_task)->pplx::task<web::http::http_response>
 #else
