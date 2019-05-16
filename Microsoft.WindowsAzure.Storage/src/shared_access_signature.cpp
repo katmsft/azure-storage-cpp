@@ -139,7 +139,7 @@ namespace azure { namespace storage { namespace protocol {
 
 #pragma region Blob SAS Helpers
 
-    utility::string_t get_blob_sas_string_to_sign(const utility::string_t& identifier, const shared_access_policy& policy, const cloud_blob_shared_access_headers& headers, const utility::string_t& resource, const storage_credentials& credentials)
+    utility::string_t get_blob_sas_string_to_sign(const utility::string_t& identifier, const shared_access_policy& policy, const cloud_blob_shared_access_headers& headers, const utility::string_t& resource, const utility::string_t& resource_type, const storage_credentials& credentials)
     {
         //// StringToSign =      signedpermissions + "\n" +
         ////                     signedstart + "\n" +
@@ -162,6 +162,8 @@ namespace azure { namespace storage { namespace protocol {
         utility::string_t string_to_sign;
         string_to_sign.reserve(256);
         get_sas_string_to_sign(string_to_sign, identifier, policy, resource);
+        string_to_sign.append(_XPLATSTR("\n")).append(resource_type);
+        string_to_sign.append(_XPLATSTR("\n"));
         string_to_sign.append(_XPLATSTR("\n")).append(headers.cache_control());
         string_to_sign.append(_XPLATSTR("\n")).append(headers.content_disposition());
         string_to_sign.append(_XPLATSTR("\n")).append(headers.content_encoding());
@@ -175,7 +177,7 @@ namespace azure { namespace storage { namespace protocol {
 
     utility::string_t get_blob_sas_token(const utility::string_t& identifier, const shared_access_policy& policy, const cloud_blob_shared_access_headers& headers, const utility::string_t& resource_type, const utility::string_t& resource, const storage_credentials& credentials)
     {
-        auto signature = get_blob_sas_string_to_sign(identifier, policy, headers, resource, credentials);
+        auto signature = get_blob_sas_string_to_sign(identifier, policy, headers, resource, resource_type, credentials);
         auto builder = get_sas_token_builder(identifier, policy, signature);
 
         add_query_if_not_empty(builder, uri_query_sas_resource, resource_type, /* do_encoding */ true);
