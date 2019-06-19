@@ -1996,11 +1996,43 @@ namespace azure { namespace storage {
             return m_impl;
         }
 
+        virtual bool is_batch_operation() const
+        {
+            return false;
+        }
+
     private:
 
         std::shared_ptr<_operation_context> m_impl;
         static client_log_level m_global_log_level;
         static web::web_proxy m_global_proxy;
+    };
+
+    class batch_operation_context : public operation_context
+    {
+    public:
+
+        batch_operation_context() {};
+
+        bool is_batch_operation() const
+        {
+            return true;
+        }
+
+        void move_add_batch_request(web::http::http_request&& request)
+        {
+            std::lock_guard<std::mutex> gurad(this->m_batch_request_vector_mutex);
+            m_batch_requests.push_back(request);
+        }
+
+        WASTORAGE_API void push_batch_request_body_for_batch_requests(utility::string_t& request_body, const utility::string_t& batch_id);
+
+    private:
+
+        static void push_batch_request_body_for_batch_request(utility::string_t& request_body, const utility::string_t& batch_id, const web::http::http_request& request, size_t content_id);
+
+        std::vector<web::http::http_request> m_batch_requests;
+        std::mutex m_batch_request_vector_mutex;
     };
 
     /// <summary>

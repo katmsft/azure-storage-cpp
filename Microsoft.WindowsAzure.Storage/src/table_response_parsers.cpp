@@ -162,14 +162,11 @@ namespace azure { namespace storage { namespace protocol {
             std::string changeset_marker_prefix = "--" + response_body.substr(changeset_begin_offset, changeset_end_offset - changeset_begin_offset);
             std::string changeset_begin_marker = changeset_marker_prefix + crlf;
 
-            size_t result_index = SIZE_MAX;
-
             // Loop through the response looking for changeset begin markers.
             size_t next_changeset = response_body.find(changeset_begin_marker, changeset_end_offset);
 
             while(next_changeset != std::string::npos)
             {
-                ++result_index;
                 // Find the HTTP status line
                 size_t response_begin = response_body.find(http_begin, next_changeset + changeset_begin_marker.size());
 

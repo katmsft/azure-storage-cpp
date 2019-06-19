@@ -70,6 +70,29 @@ namespace azure { namespace storage {  namespace core {
         write_line_break(body_text);
     }
 
+    void write_batch_required_headers(utility::string_t& body_text, size_t content_id)
+    {
+        body_text.append(web::http::header_names::content_type);
+        body_text.push_back(_XPLATSTR(':'));
+        body_text.push_back(_XPLATSTR(' '));
+        body_text.append(protocol::header_value_content_type_http);
+        write_line_break(body_text);
+
+        body_text.append(protocol::header_content_id);
+        body_text.push_back(_XPLATSTR(':'));
+        body_text.push_back(_XPLATSTR(' '));
+        body_text.append(convert_to_string(content_id));
+        write_line_break(body_text);
+
+        body_text.append(protocol::header_content_transfer_encoding);
+        body_text.push_back(_XPLATSTR(':'));
+        body_text.push_back(_XPLATSTR(' '));
+        body_text.append(protocol::header_value_content_transfer_encoding_binary);
+        write_line_break(body_text);
+
+        write_line_break(body_text);
+    }
+
     void write_request_line(utility::string_t& body_text, const web::http::method& method, const web::http::uri& uri)
     {
         body_text.append(method);
@@ -80,11 +103,26 @@ namespace azure { namespace storage {  namespace core {
         write_line_break(body_text);
     }
 
+    void write_request_line(utility::string_t& body_text, const web::http::method& method, const utility::string_t& destination)
+    {
+        body_text.append(method);
+        body_text.push_back(_XPLATSTR(' '));
+        body_text.append(destination);
+        body_text.push_back(_XPLATSTR(' '));
+        body_text.append(protocol::http_version);
+        write_line_break(body_text);
+    }
+
     void write_request_headers(utility::string_t& body_text, const web::http::http_headers& headers)
     {
         for (web::http::http_headers::const_iterator it = headers.begin(); it != headers.end(); ++it)
         {
             const utility::string_t& header_name = it->first;
+            //eliminate x-ms-version header
+            if (header_name == protocol::ms_header_version)
+            {
+                continue;
+            }
             const utility::string_t& header_value = it->second;
 
             body_text.append(header_name);
@@ -105,6 +143,14 @@ namespace azure { namespace storage {  namespace core {
         }
 
         write_line_break(body_text);
+    }
+
+    void write_request_payload(utility::string_t& body_text, const concurrency::streams::istream& payload)
+    {
+        UNREFERENCED_PARAMETER(body_text);
+        UNREFERENCED_PARAMETER(payload);
+        // currently does nothing.
+        // TODO: support request body copy to utility::string_t when request with payload can be batched.
     }
 
 }}} // namespace azure::storage::core

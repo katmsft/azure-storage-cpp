@@ -20,6 +20,7 @@
 #include "limits"
 #include "service_client.h"
 #include "wascore/timer_handler.h"
+#include "was/blob_batch_results.h"
 
 #pragma push_macro("max")
 #undef max
@@ -2970,6 +2971,37 @@ namespace azure { namespace storage {
         /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
         /// <returns>A <see cref="pplx::task" /> object of type <see cref="azure::storage::service_stats" /> that represents the current operation.</returns>
         WASTORAGE_API pplx::task<account_properties> download_account_properties_async(const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token) const;
+
+        /// <summary>
+        /// Perform a batch operation to the server.
+        /// </summary>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="batch_operation_context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation, and holds the operations to be performed in a batch</param>
+        /// <returns>A <see cref="pplx::task" /> object of type <see cref="azure::storage::service_stats" /> that represents the current operation.</returns>
+        blob_batch_results execute_batch(const blob_request_options& options, batch_operation_context& context) const
+        {
+            return execute_batch_async(options, context, pplx::cancellation_token::none()).get();
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation perform a batch operation to the server.
+        /// </summary>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="batch_operation_context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation, and holds the operations to be performed in a batch</param>
+        /// <returns>A <see cref="pplx::task" /> object of type <see cref="azure::storage::service_stats" /> that represents the current operation.</returns>
+        pplx::task<blob_batch_results> execute_batch_async(const blob_request_options& options, batch_operation_context& context) const
+        {
+            return execute_batch_async(options, context, pplx::cancellation_token::none());
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation perform a batch operation to the server.
+        /// </summary>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="batch_operation_context">An <see cref="azure::storage::batch_operation_context" /> object that represents the context for the current operation, and holds the operations to be performed in a batch</param>
+        /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
+        /// <returns>A <see cref="pplx::task" /> object of type <see cref="azure::storage::service_stats" /> that represents the current operation.</returns>
+        WASTORAGE_API pplx::task<blob_batch_results> execute_batch_async(const blob_request_options& options, batch_operation_context& context, const pplx::cancellation_token& cancellation_token) const;
 
         /// <summary>
         /// Returns a reference to an <see cref="azure::storage::cloud_blob_container" /> object.

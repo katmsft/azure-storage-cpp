@@ -443,7 +443,6 @@ namespace azure { namespace storage { namespace protocol {
 
     web::http::http_request execute_batch_operation(Concurrency::streams::stringstreambuf& response_buffer, const cloud_table& table, const table_batch_operation& batch_operation, table_payload_format payload_format, bool is_query, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
     {
-        utility::string_t batch_boundary_name = core::generate_boundary_name(_XPLATSTR("batch"));
         utility::string_t changeset_boundary_name = core::generate_boundary_name(_XPLATSTR("changeset"));
         
         web::http::http_request request = table_base_request(web::http::methods::POST, uri_builder, timeout, context);
@@ -454,14 +453,14 @@ namespace azure { namespace storage { namespace protocol {
 
         web::http::http_headers& request_headers = request.headers();
         request_headers.add(web::http::header_names::accept_charset, header_value_charset_utf8);
-        populate_http_headers(request_headers, batch_boundary_name);
+        populate_http_headers(request_headers, protocol::batch_boundary_name);
 
         table_batch_operation::operations_type operations = batch_operation.operations();
 
         web::http::uri base_uri = table.service_client().base_uri().primary_uri();
         utility::string_t body_text;
 
-        core::write_boundary(body_text, batch_boundary_name);
+        core::write_boundary(body_text, protocol::batch_boundary_name);
 
         // Write batch headers
         if (!is_query)
@@ -509,7 +508,7 @@ namespace azure { namespace storage { namespace protocol {
             core::write_boundary(body_text, changeset_boundary_name, /* is_closure */ true);
         }
 
-        core::write_boundary(body_text, batch_boundary_name, /* is_closure */ true);
+        core::write_boundary(body_text, protocol::batch_boundary_name, /* is_closure */ true);
 
         request.set_body(body_text);
 

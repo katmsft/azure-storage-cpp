@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{A8E200A6-910E-44F4-9E8E-C37E45B7AD42}</ProjectGuid>
+    <ProjectGuid>{25D342C3-6CDA-44DD-A16A-32A19B692785}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>MicrosoftWindowsAzureStorage</RootNamespace>
   </PropertyGroup>
@@ -173,6 +173,7 @@
     <ClInclude Include="includes\wascore\xml_wrapper.h" />
     <ClInclude Include="includes\was\auth.h" />
     <ClInclude Include="includes\was\blob.h" />
+    <ClInclude Include="includes\was\blob_batch_results.h" />
     <ClInclude Include="includes\was\common.h" />
     <ClInclude Include="includes\was\core.h" />
     <ClInclude Include="includes\was\error_code_strings.h" />
@@ -202,6 +203,7 @@
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\batch_operation_context.cpp" />
     <ClCompile Include="src\executor.cpp" />
     <ClCompile Include="src\timer_handler.cpp" />
     <ClCompile Include="src\authentication.cpp" />

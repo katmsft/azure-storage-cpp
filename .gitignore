@@ -5,6 +5,7 @@
 *.suo
 *.user
 *.sln.docstates
+*.vcxproj.filters
 
 # Build results
 [Dd]ebug/
@@ -182,6 +183,9 @@ $RECYCLE.BIN/
 
 # build folders under Linux
 Microsoft.WindowsAzure.Storage/build.*/
+
+# UnitTest++
+Microsoft.WindowsAzure.Storage/tests/UnitTest/
 
 # ==========================
 # OSX detritus

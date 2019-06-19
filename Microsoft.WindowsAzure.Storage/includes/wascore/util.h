@@ -56,8 +56,11 @@ namespace azure { namespace storage { namespace core {
     void write_boundary(utility::string_t& body_text, const utility::string_t& boundary_name, bool is_closure = false);
     void write_mime_changeset_headers(utility::string_t& body_text);
     void write_request_line(utility::string_t& body_text, const web::http::method& method, const web::http::uri& uri);
+    void write_request_line(utility::string_t& body_text, const web::http::method& method, const utility::string_t& destination);
     void write_request_headers(utility::string_t& body_text, const web::http::http_headers& headers);
+    void write_batch_required_headers(utility::string_t& body_text, size_t content_id);
     void write_request_payload(utility::string_t& body_text, const web::json::value& json_object);
+    void write_request_payload(utility::string_t& body_text, const concurrency::streams::istream& payload);
 
 #pragma endregion
 

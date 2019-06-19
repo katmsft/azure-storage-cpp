@@ -70,6 +70,7 @@ namespace azure { namespace storage { namespace protocol {
     web::http::http_request abort_copy_blob(const utility::string_t& copy_id, const access_condition& condition, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context);
     web::http::http_request incremental_copy_blob(const web::http::uri& source, const access_condition& condition, const cloud_metadata& metadata, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context);
     web::http::http_request set_blob_tier(const utility::string_t& tier, const access_condition& condition, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context);
+    web::http::http_request blob_batch_operation(const utility::string_t& batch_id, const utility::string_t& request_body, web::http::uri_builder& uri_builder, operation_context context);
     void add_lease_id(web::http::http_request& request, const access_condition& condition);
     void add_sequence_number_condition(web::http::http_request& request, const access_condition& condition);
     void add_access_condition(web::http::http_request& request, const access_condition& condition);
@@ -214,6 +215,7 @@ namespace azure { namespace storage { namespace protocol {
         static cloud_blob_container_properties parse_blob_container_properties(const web::http::http_response& response);
         static cloud_blob_properties parse_blob_properties(const web::http::http_response& response);
         static account_properties parse_account_properties(const web::http::http_response& response);
+        static blob_batch_results parse_blob_batch_result(const web::http::http_response & response);
     };
 
     class table_response_parsers

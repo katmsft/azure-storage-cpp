@@ -120,6 +120,27 @@ namespace azure { namespace storage {
         return download_account_properties_base_async(base_uri(), modified_options, context, cancellation_token);
     }
 
+    pplx::task<blob_batch_results> cloud_blob_client::execute_batch_async(const blob_request_options & options, batch_operation_context & context, const pplx::cancellation_token & cancellation_token) const
+    {
+        blob_request_options modified_options(options);
+        modified_options.apply_defaults(default_request_options(), blob_type::unspecified);
+        auto batch_id = utility::uuid_to_string(utility::new_uuid());
+
+        auto command = std::make_shared<core::storage_command<blob_batch_results>>(base_uri(), cancellation_token, modified_options.is_maximum_execution_time_customized());
+        command->set_authentication_handler(std::make_shared<protocol::authentication_handler>(protocol::authentication_handler()));
+        command->set_location_mode(core::command_location_mode::primary_or_secondary);
+        utility::string_t request_body = utility::string_t();
+        context.push_batch_request_body_for_batch_requests(request_body, batch_id);
+        command->set_build_request(std::bind(protocol::blob_batch_operation, batch_id, request_body, std::placeholders::_1, std::placeholders::_3));
+        command->set_preprocess_response(std::bind(protocol::preprocess_response<blob_batch_results>, blob_batch_results(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        command->set_postprocess_response([](const web::http::http_response& response, const request_result&, const core::ostream_descriptor&, operation_context context) mutable -> pplx::task<blob_batch_results>
+        {
+            return pplx::task_from_result<blob_batch_results>(protocol::blob_response_parsers::parse_blob_batch_result(response));
+        });
+
+        return core::executor<blob_batch_results>::execute_async(command, modified_options, operation_context(context));
+    }
+
     cloud_blob_container cloud_blob_client::get_root_container_reference() const
     {
         return get_container_reference(protocol::root_container);

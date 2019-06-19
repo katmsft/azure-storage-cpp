@@ -145,7 +145,16 @@ namespace azure { namespace storage { namespace core {
 #endif
 
             // 5-6. Potentially upload data and get response
+            // Or adds the request generated in a batch operation context for later batch operation.
             instance->assert_canceled();
+
+            if (instance->m_context.is_batch_operation())
+            {
+                // m_request about to expire and move to avoid extra copy.
+                dynamic_cast<batch_operation_context&>(instance->m_context).move_add_batch_request(std::move(instance->m_request));
+                return pplx::task<bool>([]() { return false; });
+            }
+
 #ifdef _WIN32
             web::http::client::http_client client(instance->m_request.request_uri().authority(), config);
             return client.request(instance->m_request, instance->m_command->get_cancellation_token()).then([instance](pplx::task<web::http::http_response> get_headers_task)->pplx::task<web::http::http_response>

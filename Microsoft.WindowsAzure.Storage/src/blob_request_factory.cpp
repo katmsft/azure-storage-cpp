@@ -553,6 +553,18 @@ namespace azure { namespace storage { namespace protocol {
         return request;
     }
 
+    web::http::http_request blob_batch_operation(const utility::string_t & batch_id, const utility::string_t& request_body, web::http::uri_builder & uri_builder, operation_context context)
+    {
+        utility::string_t path(_XPLATSTR("$batch"));
+        uri_builder.append_path(path, /* do_encoding */ true);
+
+        web::http::http_request request(base_request(web::http::methods::POST, uri_builder, std::chrono::seconds(0)/*timeout always 0*/, context));
+        request.set_body(request_body);
+        request.headers().add(protocol::header_content_type, protocol::header_value_batch_id_prefix + batch_id);
+
+        return request;
+    }
+
     void add_lease_id(web::http::http_request& request, const access_condition& condition)
     {
         add_optional_header(request.headers(), ms_header_lease_id, condition.lease_id());

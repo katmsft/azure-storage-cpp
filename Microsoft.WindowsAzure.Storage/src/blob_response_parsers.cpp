@@ -205,4 +205,69 @@ namespace azure { namespace storage { namespace protocol {
         return properties;
     }
 
+    utility::string_t parse_batch_id(const utility::string_t& content_type_value)
+    {
+        utility::string_t batch_id;
+        static const utility::string_t batch_id_prefix(_XPLATSTR("boundary="));
+        size_t batch_id_offset_begin = content_type_value.find(batch_id_prefix) + batch_id_prefix.size();
+        batch_id = content_type_value.substr(batch_id_offset_begin);
+        return batch_id;
+    }
+
+    void parse_set_batch_headers(blob_batch_result& result, const utility::string_t& batch_header_string)
+    {
+        static const utility::string_t delimiter(_XPLATSTR(": ")), crlf(_XPLATSTR("\r\n"));
+        size_t pos = 0, previous_pos = 0;
+        while ((pos = batch_header_string.find(crlf, previous_pos)) != utility::string_t::npos)
+        {
+            //header key starting at previous_pos.
+            size_t header_key_end_pos = batch_header_string.find(delimiter, previous_pos);
+            // header value ends at pos.
+            size_t header_value_start_pos = header_key_end_pos + delimiter.size();
+            result.headers()[batch_header_string.substr(previous_pos, header_key_end_pos - previous_pos + 1)] = batch_header_string.substr(header_value_start_pos, pos - header_value_start_pos + 1);
+            previous_pos = pos + crlf.size();
+        }
+    }
+
+    blob_batch_results blob_response_parsers::parse_blob_batch_result(const web::http::http_response& response)
+    {
+        blob_batch_results results;
+        utility::string_t body = response.extract_string().get();
+
+
+        static const utility::string_t http_begin(_XPLATSTR("HTTP")), server_header(_XPLATSTR("Server: ")), crlf(_XPLATSTR("\r\n")), crlfcrlf(_XPLATSTR("\r\n\r\n"));
+        static const utility::string_t double_hypen(_XPLATSTR("--")), space(_XPLATSTR(" "));
+
+        utility::string_t changeset_marker_prefix = double_hypen + parse_batch_id((response.headers().find(utility::string_t(protocol::header_content_type)))->second);
+        utility::string_t changeset_begin_marker = changeset_marker_prefix + crlf;
+
+        // Loop through the response looking for changeset begin markers.
+        size_t next_changeset = body.find(changeset_begin_marker);
+        while (next_changeset != utility::string_t::npos)
+        {
+            blob_batch_result result;
+            // Find the HTTP status line
+            size_t response_begin = body.find(http_begin, next_changeset + changeset_begin_marker.size());
+
+            // Find the status code within that line
+            size_t status_code_begin = body.find(space, response_begin) + space.size();
+            size_t status_code_end = body.find(space, status_code_begin);
+            utility::string_t status_code_string = body.substr(status_code_begin, status_code_end - status_code_begin + 1);
+
+            // Extract the status code as an web::http::status_code
+            result.set_status_code(utility::conversions::details::scan_string<web::http::status_code>(status_code_string));
+
+            //parse the headers
+            //header will always end with "Server: <Header Value>, header value\r\n" e.g. Windows-Azure-Blob/1.0
+            size_t header_begin = body.find(crlf, status_code_end + status_code_string.size()) + crlf.size();
+            size_t server_header_begin = body.find(server_header, header_begin);
+            size_t header_end = body.find(crlf, server_header_begin) + crlf.size();
+            parse_set_batch_headers(result, body.substr(header_begin, header_end - header_begin + 1));
+
+            next_changeset = body.find(changeset_begin_marker, header_end);
+            result.set_body(body.substr(header_end, next_changeset - header_end + 1 - crlf.size()));
+            results.batch_results().push_back(result);
+        }
+        return results;
+    }
 }}} // namespace azure::storage::protocol

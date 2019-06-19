@@ -109,6 +109,7 @@ DAT(component_tier, _XPLATSTR("tier"))
 // common resources
 DAT(root_container, _XPLATSTR("$root"))
 DAT(directory_delimiter, _XPLATSTR("/"))
+DAT(batch_boundary_name, _XPLATSTR("batch"))
 
 // headers
 DAT(http_version, _XPLATSTR("HTTP/1.1"))
@@ -117,6 +118,7 @@ DAT(header_max_data_service_version, _XPLATSTR("MaxDataServiceVersion"))
 DAT(header_prefer, _XPLATSTR("Prefer"))
 DAT(header_content_transfer_encoding, _XPLATSTR("Content-Transfer-Encoding"))
 DAT(header_content_id, _XPLATSTR("Content-ID"))
+DAT(header_content_type, _XPLATSTR("Content-Type"))
 DAT(ms_header_prefix, _XPLATSTR("x-ms-"))
 DAT(ms_header_date, _XPLATSTR("x-ms-date"))
 DAT(ms_header_version, _XPLATSTR("x-ms-version"))
@@ -185,7 +187,7 @@ DAT(ms_header_sku_name, _XPLATSTR("x-ms-sku-name"))
 DAT(ms_header_account_kind, _XPLATSTR("x-ms-account-kind"))
 
 // header values
-DAT(header_value_storage_version, _XPLATSTR("2018-03-28"))
+DAT(header_value_storage_version, _XPLATSTR("2019-02-02"))
 DAT(header_value_true, _XPLATSTR("true"))
 DAT(header_value_false, _XPLATSTR("false"))
 DAT(header_value_locked, _XPLATSTR("locked"))
@@ -242,6 +244,7 @@ DAT(header_value_access_tier_p50, _XPLATSTR("P50"))
 DAT(header_value_access_tier_p60, _XPLATSTR("P60"))
 DAT(header_value_archive_status_to_hot, _XPLATSTR("rehydrate-pending-to-hot"))
 DAT(header_value_archive_status_to_cool, _XPLATSTR("rehydrate-pending-to-cool"))
+DAT(header_value_batch_id_prefix, _XPLATSTR("multipart/mixed; boundary=batch_"))
 
 // xml strings
 DAT(xml_last_modified, _XPLATSTR("Last-Modified"))
@@ -438,4 +441,5 @@ DAT(error_invalid_block_size, "Append block data should not exceed the maximum b
 
 DAT(error_invalid_ip_address, "Error when parsing IP address: IP address is invalid.")
 DAT(error_ip_must_be_ipv4_in_sas, "When specifying an IP Address in a SAS token, it must be an IPv4 address.")
+DAT(error_batch_size_too_huge, "Error: the size of requests for batch operation cannot exceeds 1000.")
 #endif // _RESOURCES
