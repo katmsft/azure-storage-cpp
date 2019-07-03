@@ -102,6 +102,80 @@ namespace azure { namespace storage {
     };
 
     /// <summary>
+    /// Represents the tags for blobs.
+    /// </summary>
+    class cloud_blob_tags : public std::unordered_map<utility::string_t, utility::string_t>
+    {
+    public:
+        static const cloud_blob_tags& none()
+        {
+            static cloud_blob_tags no_value_tags;
+            static bool do_it_once = (no_value_tags.m_is_set = false);
+            UNREFERENCED_PARAMETER(do_it_once);
+            return no_value_tags;
+        }
+
+        bool is_set() const
+        {
+            return m_is_set;
+        }
+
+    private:
+        bool m_is_set = true;
+    };
+
+    enum class cloud_blob_comparison_operator
+    {
+        EQUAL,
+        GREATER_THAN,
+        GREATER_THAN_OR_EQUAL,
+        LESS_THAN,
+        LESS_THAN_OR_EQUAL
+    };
+
+    enum class cloud_blob_logical_operator
+    {
+        AND,
+        OR
+    };
+    
+    /// <summary>
+    /// Helper class used to generate the query to find blobs by tags.
+    /// </summary>
+    class cloud_blob_tag_query
+    {
+    public:
+
+        /// <summary>
+        /// Helper function to generate a query used in 'find_blobs_with_tag_query' APIs with given tag key and value, and the comparison operator.
+        /// </summary>
+        /// <param name="tag_key">The key of the tag of the filter.</param>
+        /// <param name="comparison_operator">The comparison operator of the filter.</param>
+        /// <param name="tag_key">The value of the tag of the filter.</param>
+        /// <returns>An string that represents the query. This string is NOT yet URL encoded.</returns>
+        WASTORAGE_API static utility::string_t generate_query(const utility::string_t& tag_key, cloud_blob_comparison_operator comparison_operator, const utility::string_t& tag_value);
+
+        /// <summary>
+        /// Helper function to generate a query used in 'find_blobs_with_tag_query' APIs with container name.
+        /// </summary>
+        /// <param name="container_name">The name of the container for the filter.</param>
+        /// <returns>An string that represents the query. This string is NOT yet URL encoded.</returns>
+        WASTORAGE_API static utility::string_t generate_query(const utility::string_t& container_name);
+
+        /// <summary>
+        /// Append a query to the existing queries.
+        /// </summary>
+        /// <param name="filters">The existing queries</param>
+        /// <param name="logical_operator">The logical operator of the query to be added.</param>
+        /// <param name="filter">The query to be added.</param>
+        /// <returns>An string that represents the query. This string is NOT yet URL encoded.</returns>
+        WASTORAGE_API static void append_query(utility::string_t& queries, cloud_blob_logical_operator logical_operator, const utility::string_t& query);
+
+    private:
+        cloud_blob_tag_query() {}
+    };
+
+    /// <summary>
     /// Represents account properties for blob service.
     /// </summary>
     class account_properties
@@ -618,6 +692,18 @@ namespace azure { namespace storage {
         }
 
         /// <summary>
+        /// Generates an access condition such that an operation will be performed only if the if_tags condition has been met.
+        /// </summary>
+        /// <param name="if_tags">The tags conditional string to validate against the destination blob.</param>
+        /// <returns>An <see cref="azure::storage::access_condition" /> object that represents the if-tags condition.</returns>
+        static access_condition generate_if_tags_condition(utility::string_t if_tags)
+        {
+            access_condition condition;
+            condition.set_if_tags(std::move(if_tags));
+            return condition;
+        }
+
+        /// <summary>
         /// Gets an ETag value that must match the ETag of a resource.
         /// </summary>
         /// <returns>A string containing the ETag, in quotes.</returns>
@@ -811,6 +897,24 @@ namespace azure { namespace storage {
         }
 
         /// <summary>
+        /// Gets a tags conditional string.
+        /// </summary>
+        /// <returns>A string containing the tag conditional string.</returns>
+        const utility::string_t& if_tags() const
+        {
+            return m_if_tags;
+        }
+
+        /// <summary>
+        /// Sets an tags conditional string that must be matched for the destination resource.
+        /// </summary>
+        /// <param name="value">A string containing the tag conditional string.</param>
+        void set_if_tags(utility::string_t value)
+        {
+            m_if_tags = std::move(value);
+        }
+
+        /// <summary>
         /// Indicates whether the <see cref="azure::storage::access_condition" /> object specifies a condition.
         /// </summary>
         /// <returns><c>true</c> if the access condition specifies a condition; otherwise, <c>false</c>.</returns>
@@ -819,7 +923,8 @@ namespace azure { namespace storage {
             return !m_if_match_etag.empty() ||
                 !m_if_none_match_etag.empty() ||
                 m_if_modified_since_time.is_initialized() ||
-                m_if_not_modified_since_time.is_initialized();
+                m_if_not_modified_since_time.is_initialized() ||
+                m_if_tags.empty();
         }
 
     private:
@@ -829,6 +934,7 @@ namespace azure { namespace storage {
         utility::datetime m_if_modified_since_time;
         utility::datetime m_if_not_modified_since_time;
         utility::string_t m_lease_id;
+        utility::string_t m_if_tags;
         int64_t m_sequence_number;
         sequence_number_operators m_sequence_number_operator;
         int64_t m_max_size;
@@ -1002,9 +1108,13 @@ namespace azure { namespace storage {
     };
 
     class list_blob_item;
+    class find_blob_item;
 
     typedef result_segment<list_blob_item> list_blob_item_segment;
     typedef result_iterator<list_blob_item> list_blob_item_iterator;
+
+    typedef result_segment<find_blob_item> find_blob_item_segment;
+    typedef result_iterator<find_blob_item> find_blob_item_iterator;
 
     typedef result_segment<cloud_blob_container> container_result_segment;
     typedef result_iterator<cloud_blob_container> container_result_iterator;
@@ -2927,6 +3037,92 @@ namespace azure { namespace storage {
         /// <returns>A <see cref="pplx::task" /> object of string that contains user delegation key.</returns>
         WASTORAGE_API pplx::task<user_delegation_key> get_user_delegation_key_async(const utility::datetime& start, const utility::datetime& expiry, const request_options& modified_options, operation_context context, const pplx::cancellation_token& cancellation_token);
 
+        /// <summary>
+        /// Find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation will return an iterator that can be used to enumerate all matching results.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        /// <returns>An object of <see cref="azure::storage::blob::find_blob_item_iterator" /> that represents result of the current operation.</returns>
+        find_blob_item_iterator find_blobs_with_tag_query(const utility::string_t& tag_query) const
+        {
+            return find_blobs_with_tag_query(tag_query, 0, blob_request_options(), operation_context());
+        }
+
+        /// <summary>
+        /// Find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation will return an iterator that can be used to enumerate all matching results.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        /// <param name="max_results">The maximum number of results to be returned by server.</param>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation.</param>
+        /// <returns>An object of <see cref="azure::storage::blob::find_blob_item_iterator" /> that represents result of the current operation.</returns>
+        WASTORAGE_API find_blob_item_iterator find_blobs_with_tag_query(const utility::string_t& tag_query, int max_results, const blob_request_options& options, operation_context context) const;
+
+        /// <summary>
+        /// Find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation might only return partial results with a continuation token.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        find_blob_item_segment find_blobs_segmented_with_tag_query(const utility::string_t& tag_query) const
+        {
+            return find_blobs_segmented_with_tag_query_async(tag_query).get();
+        }
+
+        /// <summary>
+        /// Find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation might only return partial results with a continuation token.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        /// <param name="options">An <see cref="azure::storage::continuation_token" /> object that is used to continue enumerate unfinished result</param>
+        /// <returns>An object of <see cref="azure::storage::blob::find_blob_item_segment" /> that represents result of the current operation.</returns>
+        find_blob_item_segment find_blobs_segmented_with_tag_query(const utility::string_t& tag_query, const continuation_token& token) const
+        {
+            return find_blobs_segmented_with_tag_query_async(tag_query, token).get();
+        }
+
+        /// <summary>
+        /// Find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation might only return partial results with a continuation token.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        /// <param name="options">An <see cref="azure::storage::continuation_token" /> object that is used to continue enumerate unfinished result</param>
+        /// <param name="max_results">The maximum number of results to be returned by server.</param>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation.</param>
+        /// <returns>An object of <see cref="azure::storage::blob::find_blob_item_segment" /> that represents result of the current operation.</returns>
+        find_blob_item_segment find_blobs_segmented_with_tag_query(const utility::string_t& tag_query, const continuation_token& token, int max_results, const blob_request_options& options, operation_context context) const
+        {
+            return find_blobs_segmented_with_tag_query_async(tag_query, token, max_results, options, context, pplx::cancellation_token::none()).get();
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation might only return partial results with a continuation token.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        pplx::task<find_blob_item_segment> find_blobs_segmented_with_tag_query_async(const utility::string_t& tag_query) const
+        {
+            return find_blobs_segmented_with_tag_query_async(tag_query, continuation_token());
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation might only return partial results with a continuation token.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        /// <param name="options">An <see cref="azure::storage::continuation_token" /> object that is used to continue enumerate unfinished result</param>
+        /// <returns>A <see cref="pplx::task" /> object of type <see cref="azure::storage::blob::find_blob_item_segment" /> that represents result of the current operation.</returns>
+        pplx::task<find_blob_item_segment> find_blobs_segmented_with_tag_query_async(const utility::string_t& tag_query, const continuation_token& token) const
+        {
+            return find_blobs_segmented_with_tag_query_async(tag_query, token, 5000, blob_request_options(), operation_context(), pplx::cancellation_token::none());
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to find blobs for a given tag_query, which can be generated using the cloud_blob_tag_query helper class. Note this operation might only return partial results with a continuation token.
+        /// </summary>
+        /// <param name="tag_query">The query on tags used to find the blobs.</param>
+        /// <param name="options">An <see cref="azure::storage::continuation_token" /> object that is used to continue enumerate unfinished result</param>
+        /// <param name="max_results">The maximum number of results to be returned by server.</param>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation.</param>
+        /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
+        /// <returns>A <see cref="pplx::task" /> object of type <see cref="azure::storage::blob::find_blob_item_segment" /> that represents result of the current operation.</returns>
+        WASTORAGE_API pplx::task<find_blob_item_segment> find_blobs_segmented_with_tag_query_async(const utility::string_t& tag_query, const continuation_token& token, int max_results, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token) const;
+
     private:
         pplx::task<account_properties> download_account_properties_base_async(const storage_uri& uri, const request_options& modified_options, operation_context context, const pplx::cancellation_token& cancellation_token) const;
 
@@ -4380,7 +4576,7 @@ namespace azure { namespace storage {
         /// Initializes a new instance of the <see cref="azure::storage::cloud_blob" /> class.
         /// </summary>
         cloud_blob()
-            : m_properties(std::make_shared<cloud_blob_properties>()), m_metadata(std::make_shared<cloud_metadata>()), m_copy_state(std::make_shared<azure::storage::copy_state>())
+            : m_properties(std::make_shared<cloud_blob_properties>()), m_metadata(std::make_shared<cloud_metadata>()), m_copy_state(std::make_shared<azure::storage::copy_state>()), m_tags()
         {
             set_type(blob_type::unspecified);
         }
@@ -4405,6 +4601,15 @@ namespace azure { namespace storage {
         /// <param name="snapshot_time">The snapshot timestamp, if the blob is a snapshot.</param>
         /// <param name="credentials">The <see cref="azure::storage::storage_credentials" /> to use.</param>
         WASTORAGE_API cloud_blob(storage_uri uri, utility::string_t snapshot_time, storage_credentials credentials);
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="azure::storage::cloud_blob" /> class using an absolute URI to the blob.
+        /// </summary>
+        /// <param name="uri">An <see cref="azure::storage::storage_uri" /> object containing the absolute URI to the blob for all locations.</param>
+        /// <param name="snapshot_time">The snapshot timestamp, if the blob is a snapshot.</param>
+        /// <param name="credentials">The <see cref="azure::storage::storage_credentials" /> to use.</param>
+        /// <param name="tags">A collection of name-value pairs defining the tags of the blob.</param>
+        WASTORAGE_API cloud_blob(storage_uri uri, utility::string_t snapshot_time, storage_credentials credentials, cloud_blob_tags tags);
 
 #if defined(_MSC_VER) && _MSC_VER < 1900
         // Compilers that fully support C++ 11 rvalue reference, e.g. g++ 4.8+, clang++ 3.3+ and Visual Studio 2015+, 
@@ -5747,7 +5952,7 @@ namespace azure { namespace storage {
         /// </remarks>
         pplx::task<utility::string_t> start_copy_async(const web::http::uri& source, const access_condition& source_condition, const access_condition& destination_condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token)
         {
-            return start_copy_async(source, cloud_metadata(), source_condition, destination_condition, options, context, cancellation_token);
+            return start_copy_async(source, this->metadata(), source_condition, destination_condition, options, context, cancellation_token);
         }
 
         /// <summary>
@@ -5804,7 +6009,7 @@ namespace azure { namespace storage {
         /// </remarks>
         pplx::task<utility::string_t> start_copy_async(const cloud_blob& source, const access_condition& source_condition, const access_condition& destination_condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token)
         {
-            return start_copy_async(source, cloud_metadata(), source_condition, destination_condition, options, context, cancellation_token);
+            return start_copy_async(source, this->metadata(), source_condition, destination_condition, options, context, cancellation_token);
         }
 
         /// <summary>
@@ -5859,7 +6064,7 @@ namespace azure { namespace storage {
         /// </remarks>
         pplx::task<utility::string_t> start_copy_async(const cloud_file& source, const file_access_condition& source_condition, const access_condition& destination_condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token)
         {
-            return start_copy_async(source, cloud_metadata(), source_condition, destination_condition, options, context, cancellation_token);
+            return start_copy_async(source, this->metadata(), source_condition, destination_condition, options, context, cancellation_token);
         }
 
         /// <summary>
@@ -5986,9 +6191,116 @@ namespace azure { namespace storage {
         /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
         /// <param name="context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation.</param>
         /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
-        /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
         /// <returns>A <see cref="pplx::task" /> object of type <see cref="azure::storage::cloud_blob" /> that represents the current operation.</returns>
         WASTORAGE_API pplx::task<azure::storage::cloud_blob> create_snapshot_async(cloud_metadata metadata, const access_condition& condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token);
+
+        /// <summary>
+        /// Uploads the tags of a blob.
+        /// </summary>
+        void upload_tags()
+        {
+            return upload_tags_async().get();
+        }
+
+        /// <summary>
+        /// Uploads the tags of a blob.
+        /// </summary>
+        /// <param name="condition">An <see cref="azure::storage::access_condition" /> object that represents the access conditions for the blob, note that only if_tags are working for this API.</param>
+        void upload_tags(const access_condition& condition)
+        {
+            return upload_tags_async(condition).get();
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to upload the tags of a blob.
+        /// </summary>
+        /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
+        pplx::task<void> upload_tags_async()
+        {
+            return upload_tags_async(access_condition(), blob_request_options(), operation_context(), pplx::cancellation_token::none());
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to upload the tags of a blob.
+        /// </summary>
+        /// <param name="condition">An <see cref="azure::storage::access_condition" /> object that represents the access conditions for the blob, note that only if_tags are working for this API.</param>
+        /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
+        pplx::task<void> upload_tags_async(const access_condition& condition)
+        {
+            return upload_tags_async(condition, blob_request_options(), operation_context(), pplx::cancellation_token::none());
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to upload the tags of a blob.
+        /// </summary>
+        /// <param name="condition">An <see cref="azure::storage::access_condition" /> object that represents the access conditions for the blob, note that only if_tags are working for this API.</param>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation.</param>
+        /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
+        /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
+        WASTORAGE_API pplx::task<void> upload_tags_async(const access_condition& condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token);
+
+        /// <summary>
+        /// Downloads the tags of a blob.
+        /// </summary>
+        void download_tags()
+        {
+            return download_tags_async().get();
+        }
+
+        /// <summary>
+        /// Downloads the tags of a blob.
+        /// </summary>
+        /// <param name="condition">An <see cref="azure::storage::access_condition" /> object that represents the access conditions for the blob, note that only if_tags are working for this API.</param>
+        void download_tags(const access_condition& condition)
+        {
+            return download_tags_async(condition).get();
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to download the tags of a blob.
+        /// </summary>
+        /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
+        pplx::task<void> download_tags_async()
+        {
+            return download_tags_async(access_condition());
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to download the tags of a blob.
+        /// </summary>
+        /// <param name="condition">An <see cref="azure::storage::access_condition" /> object that represents the access conditions for the blob, note that only if_tags are working for this API.</param>
+        /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
+        pplx::task<void> download_tags_async(const access_condition& condition)
+        {
+            return download_tags_async(condition, blob_request_options(), operation_context(), pplx::cancellation_token::none());
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to download the tags of a blob.
+        /// </summary>
+        /// <param name="condition">An <see cref="azure::storage::access_condition" /> object that represents the access conditions for the blob, note that only if_tags are working for this API.</param>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation.</param>
+        /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
+        /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
+        pplx::task<void> download_tags_async(const access_condition& condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token)
+        {
+            return download_tags_async_impl(m_snapshot_time, utility::string_t(), condition, options, context, cancellation_token);
+        }
+
+        /// <summary>
+        /// Initiates an asynchronous operation to download the tags of a blob.
+        /// </summary>
+        /// <param name="condition">An <see cref="azure::storage::access_condition" /> object that represents the access conditions for the blob, note that only if_tags are working for this API.</param>
+        /// <param name="options">An <see cref="azure::storage::blob_request_options" /> object that specifies additional options for the request.</param>
+        /// <param name="context">An <see cref="azure::storage::operation_context" /> object that represents the context for the current operation.</param>
+        /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
+        /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
+        pplx::task<void> download_tags_async(const utility::string_t& version_id, const access_condition& condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token)
+        {
+            return download_tags_async_impl(m_snapshot_time, version_id, condition, options, context, cancellation_token);
+        }
 
         /// <summary>
         /// Gets the <see cref="azure::storage::cloud_blob_client" /> object that represents the Blob service.
@@ -6144,6 +6456,40 @@ namespace azure { namespace storage {
         }
 
         /// <summary>
+        /// Adds a tag to the blob
+        /// </summary>
+        void add_tag(utility::string_t key, utility::string_t value)
+        {
+            m_tags.insert_or_assign(std::move(key), std::move(value));
+        }
+
+        /// <summary>
+        /// Try to get a tag from the blob with a given key.
+        /// </summary>
+        /// <returns>The tag of the blob.</returns>
+        utility::string_t get_tag(const utility::string_t& key) const
+        {
+            return m_tags.at(key);
+        }
+
+        /// <summary>
+        /// Try to get the tags from the blob.
+        /// </summary>
+        /// <returns>The tags of the blob.</returns>
+        const cloud_blob_tags& get_tags() const
+        {
+            return m_tags;
+        }
+
+        /// <summary>
+        /// Try to set the tags to the blob.
+        /// </summary>
+        void set_tags(cloud_blob_tags tags)
+        {
+            m_tags = std::move(tags);
+        }
+
+        /// <summary>
         /// Indicates whether the <see cref="azure::storage::cloud_blob" /> object is valid.
         /// </summary>
         /// <returns><c>true</c> if the <see cref="azure::storage::cloud_blob" /> object is valid; otherwise, <c>false</c>.</returns>
@@ -6171,7 +6517,7 @@ namespace azure { namespace storage {
         /// <param name="properties">A set of properties for the blob.</param>
         /// <param name="metadata">User-defined metadata for the blob.</param>
         /// <param name="copy_state">the state of the most recent or pending copy operation.</param>
-        WASTORAGE_API cloud_blob(utility::string_t name, utility::string_t snapshot_time, cloud_blob_container container, cloud_blob_properties properties, cloud_metadata metadata, azure::storage::copy_state copy_state);
+        WASTORAGE_API cloud_blob(utility::string_t name, utility::string_t snapshot_time, cloud_blob_container container, cloud_blob_properties properties, cloud_metadata metadata, azure::storage::copy_state copy_state, azure::storage::cloud_blob_tags tags);
 
         /// <summary>
         /// Initiates an asynchronous operation to begin to copy a blob's contents, properties, and metadata to a new blob.
@@ -6194,6 +6540,7 @@ namespace azure { namespace storage {
         void assert_no_snapshot() const;
 
         WASTORAGE_API pplx::task<void> download_attributes_async_impl(const access_condition& condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token, bool use_timer = false, std::shared_ptr<core::timer_handler> timer_handler = nullptr);
+        WASTORAGE_API pplx::task<void> download_tags_async_impl(const utility::string_t& snapshot, const utility::string_t& blob_version_id, const access_condition& condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token);
 
         void set_type(blob_type value)
         {
@@ -6205,6 +6552,7 @@ namespace azure { namespace storage {
         std::shared_ptr<cloud_blob_properties> m_properties;
         std::shared_ptr<cloud_metadata> m_metadata;
         std::shared_ptr<azure::storage::copy_state> m_copy_state;
+        cloud_blob_tags m_tags;
 
     private:
 
@@ -6753,7 +7101,7 @@ namespace azure { namespace storage {
         /// <param name="cancellation_token">An <see cref="pplx::cancellation_token" /> object that is used to cancel the current operation.</param>
         /// <returns>A <see cref="pplx::task" /> object that represents the current operation.</returns>
         WASTORAGE_API pplx::task<void> upload_from_stream_async(concurrency::streams::istream source, utility::size64_t length, const access_condition& condition, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token);
-        
+
         /// <summary>
         /// Uploads a file to a block blob. If the blob already exists on the service, it will be overwritten.
         /// </summary>
@@ -9179,10 +9527,11 @@ namespace azure { namespace storage {
         /// <param name="properties">A set of properties for the blob.</param>
         /// <param name="metadata">User-defined metadata for the blob.</param>
         /// <param name="copy_state">the state of the most recent or pending copy operation.</param>
-        explicit list_blob_item(utility::string_t blob_name, utility::string_t snapshot_time, utility::string_t version_id, bool is_current_version, cloud_blob_container container, cloud_blob_properties properties, cloud_metadata metadata, copy_state copy_state)
+        explicit list_blob_item(utility::string_t blob_name, utility::string_t snapshot_time, utility::string_t version_id, bool is_current_version, cloud_blob_container container, cloud_blob_properties properties, cloud_metadata metadata, copy_state copy_state, cloud_blob_tags tags)
             : m_is_blob(true), m_name(std::move(blob_name)), m_container(std::move(container)),
             m_snapshot_time(std::move(snapshot_time)), m_version_id(std::move(version_id)), m_is_current_version(is_current_version), m_properties(std::move(properties)),
-            m_metadata(std::move(metadata)), m_copy_state(std::move(copy_state))
+            m_metadata(std::move(metadata)), m_copy_state(std::move(copy_state)),
+            m_tags(std::move(tags))
         {
         }
 
@@ -9262,7 +9611,7 @@ namespace azure { namespace storage {
                 throw std::runtime_error("Cannot access a cloud blob directory as cloud blob ");
             }
 
-            auto blob = cloud_blob(m_name, m_snapshot_time, m_container, m_properties, m_metadata, m_copy_state);
+            auto blob = cloud_blob(m_name, m_snapshot_time, m_container, m_properties, m_metadata, m_copy_state, m_tags);
             if (!m_version_id.empty())
             {
                 blob.set_version_id(m_version_id);
@@ -9295,6 +9644,68 @@ namespace azure { namespace storage {
         cloud_blob_properties m_properties;
         cloud_metadata m_metadata;
         copy_state m_copy_state;
+        cloud_blob_tags m_tags;
+    };
+
+    /// <summary>
+    /// Represents an item that may be returned by a find blobs by tags operation.
+    /// </summary>
+    class find_blob_item
+    {
+    public:
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="azure::storage::find_blob_item" /> class that represents a cloud blob.
+        /// </summary>
+        /// <param name="blob_name">The name of the blob.</param>
+        /// <param name="snapshot_time">The snapshot timestamp, if the blob is a snapshot.</param>
+        /// <param name="version_id">The version id of the blob.</param>
+        /// <param name="is_current_version">If this blob version is current active version.</param>
+        /// <param name="container">A reference to the parent container.</param>
+        /// <param name="properties">A set of properties for the blob.</param>
+        /// <param name="metadata">User-defined metadata for the blob.</param>
+        /// <param name="copy_state">the state of the most recent or pending copy operation.</param>
+        explicit find_blob_item(utility::string_t blob_name, utility::string_t container_name, utility::string_t matching_tag_value)
+            : m_name(std::move(blob_name)), m_container_name(std::move(container_name)), m_matching_tag_value(std::move(matching_tag_value))
+        {
+        }
+
+        /// <summary>
+        /// Returns the name of the blob that matches the tag.
+        /// </summary>
+        /// <returns>An <see cref="utility::string_t" /> representing the name of the blob.</returns>
+        utility::string_t get_blob_name() const
+        { 
+            return this->m_name;
+        };
+
+        /// <summary>
+        /// Returns the name of the container of the blob that matches the tag.
+        /// </summary>
+        /// <returns>An <see cref="utility::string_t" /> representing the name of the container this blob is in.</returns>
+        utility::string_t get_container_name() const
+        {
+            return this->m_container_name;
+        };
+
+        /// <summary>
+        /// Returns the tag value that matches the given tag.
+        /// </summary>
+        /// <returns>An <see cref="utility::string_t" /> representing the matched value of a given tag.</returns>
+        utility::string_t get_matching_tag_value() const
+        {
+            return this->m_matching_tag_value;
+        };
+
+        cloud_blob as_blob(const cloud_blob_client& service_client) const
+        {
+            return service_client.get_container_reference(m_container_name).get_blob_reference(m_name);
+        }
+
+    private:
+        utility::string_t m_name;
+        utility::string_t m_container_name;
+        utility::string_t m_matching_tag_value;
     };
 }} // namespace azure::storage
 

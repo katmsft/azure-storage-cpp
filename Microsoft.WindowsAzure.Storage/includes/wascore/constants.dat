@@ -42,6 +42,7 @@ DAT(uri_query_marker, _XPLATSTR("marker"))
 DAT(uri_query_max_results, _XPLATSTR("maxresults"))
 DAT(uri_query_include, _XPLATSTR("include"))
 DAT(uri_query_copy_id, _XPLATSTR("copyid"))
+DAT(uri_query_where, _XPLATSTR("where"))
 
 // SAS query parameters
 DAT(uri_query_sas_start, _XPLATSTR("st"))
@@ -113,12 +114,17 @@ DAT(component_range_list, _XPLATSTR("rangelist"))
 DAT(component_range, _XPLATSTR("range"))
 DAT(component_incrementalcopy, _XPLATSTR("incrementalcopy"))
 DAT(component_tier, _XPLATSTR("tier"))
+DAT(component_tags, _XPLATSTR("tags"))
+DAT(component_blobs, _XPLATSTR("blobs"))
+DAT(component_blob_version_id, _XPLATSTR("blob_version_id"))
 DAT(component_file_permission, _XPLATSTR("filepermission"))
 DAT(component_user_delegation_key, _XPLATSTR("userdelegationkey"))
 
 // common resources
 DAT(root_container, _XPLATSTR("$root"))
 DAT(directory_delimiter, _XPLATSTR("/"))
+DAT(query_equal_sign, _XPLATSTR("="))
+DAT(query_and_sign, _XPLATSTR("&"))
 
 // headers
 DAT(http_version, _XPLATSTR("HTTP/1.1"))
@@ -220,6 +226,9 @@ DAT(ms_header_share_provisioned_egress_mbps, _XPLATSTR("x-ms-share-provisioned-e
 DAT(ms_header_share_provisioned_ingress_mbps, _XPLATSTR("x-ms-share-provisioned-ingress-mbps"))
 DAT(ms_header_share_provisioned_iops, _XPLATSTR("x-ms-share-provisioned-iops"))
 DAT(ms_header_version_id, _XPLATSTR("x-ms-version-id"))
+DAT(ms_header_tags, _XPLATSTR("x-ms-tags"))
+DAT(ms_header_if_tags, _XPLATSTR("x-ms-if-tags"))
+DAT(ms_header_source_if_tags, _XPLATSTR("x-ms-source-if-tags"))
 
 // header values
 DAT(header_value_storage_version, _XPLATSTR("2019-12-12"))
@@ -411,6 +420,13 @@ DAT(xml_user_delegation_key_value, _XPLATSTR("Value"))
 DAT(xml_user_delegation_key_info, _XPLATSTR("KeyInfo"))
 DAT(xml_user_delegation_key_start, _XPLATSTR("Start"))
 DAT(xml_user_delegation_key_expiry, _XPLATSTR("Expiry"))
+DAT(xml_tags, _XPLATSTR("Tags"))
+DAT(xml_tag_set, _XPLATSTR("TagSet"))
+DAT(xml_tag, _XPLATSTR("Tag"))
+DAT(xml_key, _XPLATSTR("Key"))
+DAT(xml_value, _XPLATSTR("Value"))
+DAT(xml_tag_value, _XPLATSTR("TagValue"))
+DAT(xml_where, _XPLATSTR("Where"))
 
 // json strings
 DAT(json_file_permission, _XPLATSTR("permission"))
@@ -467,6 +483,7 @@ DAT(error_missing_params_for_sas, "Missing mandatory parameters for valid Shared
 DAT(error_md5_options_mismatch, "When uploading a blob in a single request, store_blob_content_md5 must be set to true if use_transactional_md5 is true, because the MD5 calculated for the transaction will be stored in the blob.")
 DAT(error_storage_uri_empty, "Primary or secondary location URI must be supplied.")
 DAT(error_storage_uri_mismatch, "Primary and secondary location URIs must point to the same resource.")
+DAT(error_get_tag_conflict_snapshot_version_id, "Get blob operation can only have snapshot OR blob version ID specified.")
 
 #if defined(_WIN32)
 DAT(error_operation_canceled, "operation canceled")
@@ -516,4 +533,6 @@ DAT(error_invalid_block_size, "Append block data should not exceed the maximum b
 
 DAT(error_invalid_ip_address, "Error when parsing IP address: IP address is invalid.")
 DAT(error_ip_must_be_ipv4_in_sas, "When specifying an IP Address in a SAS token, it must be an IPv4 address.")
+DAT(error_tag_key_cannot_be_empty, "Tag key should not be empty")
+DAT(error_query_to_add_cannot_be_empty, "When adding a query, the query itself cannot be empty.")
 #endif // _RESOURCES

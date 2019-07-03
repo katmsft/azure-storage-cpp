@@ -301,6 +301,212 @@ SUITE(Blob)
         CHECK(blobs_copy.empty());
     }
 
+    TEST_FIXTURE(blob_test_base, find_blobs_with_tag_query_same_container)
+    {
+        std::vector<azure::storage::cloud_blob> blobs;
+        auto prefix = get_random_container_name();
+
+        std::vector<azure::storage::cloud_blob> blobs2;
+        auto prefix2 = get_random_container_name();
+
+        for (int i = 0; i < 3; i++)
+        {
+            auto index = azure::storage::core::convert_to_string(i);
+            auto blob = m_container.get_block_blob_reference(prefix + index);
+            blob.upload_text(_XPLATSTR("test"), azure::storage::access_condition(), azure::storage::blob_request_options(), m_context);
+            blob.add_tag(_XPLATSTR("tag_key1"), _XPLATSTR("tag_value1"));
+            blob.add_tag(_XPLATSTR("tag_key2"), _XPLATSTR("tag_value2"));
+            blob.upload_tags();
+            blobs.push_back(blob);
+        }
+
+        for (int i = 0; i < 4; i++)
+        {
+            auto index = azure::storage::core::convert_to_string(i);
+            auto blob = m_container.get_block_blob_reference(prefix2 + index);
+            blob.upload_text(_XPLATSTR("test2"), azure::storage::access_condition(), azure::storage::blob_request_options(), m_context);
+            blob.add_tag(_XPLATSTR("tag_key3"), _XPLATSTR("tag_value3"));
+            blob.add_tag(_XPLATSTR("tag_key4"), _XPLATSTR("tag_value4"));
+            blob.upload_tags();
+            blobs2.push_back(blob);
+        }
+
+        std::vector<azure::storage::cloud_blob> all_blobs(blobs);
+        all_blobs.insert(all_blobs.end(), blobs2.begin(), blobs2.end());
+
+        auto find_all_blobs_with_tag_query = [this] (const utility::string_t& filter) {
+            std::vector<azure::storage::cloud_blob> blobs;
+            for (auto&& item : this->m_client.find_blobs_with_tag_query(filter))
+            {
+                blobs.push_back(std::move(item.as_blob(this->m_client)));
+            }
+
+            return blobs;
+        };
+
+        {
+            auto query = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key1"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value1"));
+            auto container_query = azure::storage::cloud_blob_tag_query::generate_query(m_container.name());
+            azure::storage::cloud_blob_tag_query::append_query(query, azure::storage::cloud_blob_logical_operator::AND, container_query);
+            auto result = find_all_blobs_with_tag_query(query);
+            CHECK_EQUAL(blobs.size(), result.size());
+            std::vector<azure::storage::cloud_blob> blobs_copy(blobs);
+
+            for (auto blob : blobs)
+            {
+                for (auto iter = blobs_copy.begin(); iter != blobs_copy.end(); ++iter)
+                {
+                    if (iter->name() == blob.name())
+                    {
+                        blobs_copy.erase(iter);
+                        break;
+                    }
+                }
+            }
+
+            CHECK(blobs_copy.empty());
+        }
+
+        {
+            auto query1 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key1"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value1"));
+            auto query2 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key2"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value2"));
+            azure::storage::cloud_blob_tag_query::append_query(query1, azure::storage::cloud_blob_logical_operator::AND, query2);
+            auto container_query = azure::storage::cloud_blob_tag_query::generate_query(m_container.name());
+            azure::storage::cloud_blob_tag_query::append_query(query1, azure::storage::cloud_blob_logical_operator::AND, container_query);
+
+            auto result = find_all_blobs_with_tag_query(query1);
+            CHECK_EQUAL(blobs.size(), result.size());
+            std::vector<azure::storage::cloud_blob> blobs_copy(blobs);
+
+            for (auto blob : blobs)
+            {
+                for (auto iter = blobs_copy.begin(); iter != blobs_copy.end(); ++iter)
+                {
+                    if (iter->name() == blob.name())
+                    {
+                        blobs_copy.erase(iter);
+                        break;
+                    }
+                }
+            }
+
+            CHECK(blobs_copy.empty());
+        }
+
+        {
+            auto query1 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key1"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value1"));
+            auto query2 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key3"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value3"));
+            azure::storage::cloud_blob_tag_query::append_query(query1, azure::storage::cloud_blob_logical_operator::AND, query2);
+            auto container_query = azure::storage::cloud_blob_tag_query::generate_query(m_container.name());
+            azure::storage::cloud_blob_tag_query::append_query(query1, azure::storage::cloud_blob_logical_operator::AND, container_query);
+
+            auto result = find_all_blobs_with_tag_query(query1);
+            CHECK_EQUAL(0U, result.size());
+        }
+
+        {
+            auto query1 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key1"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value1"));
+            auto query2 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key2"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value2"));
+            azure::storage::cloud_blob_tag_query::append_query(query1, azure::storage::cloud_blob_logical_operator::AND, query2);
+            auto container_query = azure::storage::cloud_blob_tag_query::generate_query(m_container.name());
+            azure::storage::cloud_blob_tag_query::append_query(query1, azure::storage::cloud_blob_logical_operator::AND, container_query);
+
+            auto result = find_all_blobs_with_tag_query(query1);
+            CHECK_EQUAL(blobs.size(), result.size());
+            std::vector<azure::storage::cloud_blob> blobs_copy(blobs);
+
+            for (auto blob : blobs)
+            {
+                for (auto iter = blobs_copy.begin(); iter != blobs_copy.end(); ++iter)
+                {
+                    if (iter->name() == blob.name())
+                    {
+                        blobs_copy.erase(iter);
+                        break;
+                    }
+                }
+            }
+
+            CHECK(blobs_copy.empty());
+        }
+    }
+
+    TEST_FIXTURE(blob_test_base, find_blobs_with_tag_query_different_container)
+    {
+        std::vector<azure::storage::cloud_blob> blobs;
+        auto prefix = get_random_container_name();
+
+        std::vector<azure::storage::cloud_blob> blobs2;
+        auto prefix2 = get_random_container_name();
+
+        auto container1 = m_client.get_container_reference(get_random_container_name());
+        auto container2 = m_client.get_container_reference(get_random_container_name());
+        container1.create_if_not_exists();
+        container2.create_if_not_exists();
+
+        for (int i = 0; i < 3; i++)
+        {
+            auto index = azure::storage::core::convert_to_string(i);
+            auto blob = container1.get_block_blob_reference(prefix + index);
+            blob.upload_text(_XPLATSTR("test"), azure::storage::access_condition(), azure::storage::blob_request_options(), m_context);
+            blob.add_tag(_XPLATSTR("tag_key1"), _XPLATSTR("tag_value1"));
+            blob.add_tag(_XPLATSTR("tag_key2"), _XPLATSTR("tag_value2"));
+            blob.upload_tags();
+            blobs.push_back(blob);
+        }
+
+        for (int i = 0; i < 4; i++)
+        {
+            auto index = azure::storage::core::convert_to_string(i);
+            auto blob = container2.get_block_blob_reference(prefix2 + index);
+            blob.upload_text(_XPLATSTR("test2"), azure::storage::access_condition(), azure::storage::blob_request_options(), m_context);
+            blob.add_tag(_XPLATSTR("tag_key3"), _XPLATSTR("tag_value3"));
+            blob.add_tag(_XPLATSTR("tag_key4"), _XPLATSTR("tag_value4"));
+            blob.upload_tags();
+            blobs2.push_back(blob);
+        }
+
+        std::vector<azure::storage::cloud_blob> all_blobs(blobs);
+        all_blobs.insert(all_blobs.end(), blobs2.begin(), blobs2.end());
+
+        auto find_all_blobs_with_tag_query = [this](const utility::string_t& filter) {
+            std::vector<azure::storage::cloud_blob> blobs;
+            for (auto&& item : this->m_client.find_blobs_with_tag_query(filter))
+            {
+                blobs.push_back(std::move(item.as_blob(this->m_client)));
+            }
+
+            return blobs;
+        };
+
+        {
+            auto query1 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key1"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value1"));
+            auto query2 = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key2"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value2"));
+            azure::storage::cloud_blob_tag_query::append_query(query1, azure::storage::cloud_blob_logical_operator::AND, query2);
+
+            auto result = find_all_blobs_with_tag_query(query1);
+            CHECK(blobs.size() <= result.size());
+            std::vector<azure::storage::cloud_blob> blobs_copy(blobs);
+
+            for (auto blob : blobs)
+            {
+                for (auto iter = blobs_copy.begin(); iter != blobs_copy.end(); ++iter)
+                {
+                    if (iter->name() == blob.name())
+                    {
+                        blobs_copy.erase(iter);
+                        break;
+                    }
+                }
+            }
+
+            CHECK(blobs_copy.empty());
+        }
+
+        container1.delete_container_if_exists();
+        container2.delete_container_if_exists();
+    }
+
     TEST_FIXTURE(test_base, blob_shared_key_lite)
     {
         auto client = test_config::instance().account().create_cloud_blob_client();

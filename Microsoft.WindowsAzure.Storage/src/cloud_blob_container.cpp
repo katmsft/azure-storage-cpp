@@ -445,9 +445,9 @@ namespace azure { namespace storage {
         auto instance = std::make_shared<cloud_blob_container>(*this);
         return list_blob_item_iterator(
             [instance, prefix, use_flat_blob_listing, includes, options, context](const continuation_token& token, size_t max_results_per_segment)
-        {
-            return instance->list_blobs_segmented(prefix, use_flat_blob_listing, includes, (int)max_results_per_segment, token, options, context);
-        },
+            {
+                return instance->list_blobs_segmented(prefix, use_flat_blob_listing, includes, (int)max_results_per_segment, token, options, context);
+            },
             max_results, 0);
     }
 
@@ -488,7 +488,7 @@ namespace azure { namespace storage {
             {
                 auto properties = iter->move_properties();
                 utility::string_t version_id = (includes & blob_listing_details::values::versions) ? properties.version_id() : utility::string_t();
-                list_blob_items.push_back(list_blob_item(iter->move_name(), iter->move_snapshot_time(), std::move(version_id), iter->is_current_version(), container, std::move(properties), iter->move_metadata(), iter->move_copy_state()));
+                list_blob_items.push_back(list_blob_item(iter->move_name(), iter->move_snapshot_time(), std::move(version_id), iter->is_current_version(), container, std::move(properties), iter->move_metadata(), iter->move_copy_state(), iter->move_tags()));
             }
 
             for (auto iter = blob_prefix_items.begin(); iter != blob_prefix_items.end(); ++iter)

@@ -22,6 +22,68 @@
 
 namespace azure { namespace storage {
 
+    utility::string_t cloud_blob_tag_query::generate_query(const utility::string_t& tag_key, cloud_blob_comparison_operator comparison_operator, const utility::string_t& tag_value)
+    {
+        if (tag_key.empty())
+        {
+            throw storage_exception(protocol::error_tag_key_cannot_be_empty, false);
+        }
+        utility::string_t comparison_operator_string;
+        switch (comparison_operator)
+        {
+        case cloud_blob_comparison_operator::EQUAL:
+            comparison_operator_string = _XPLATSTR("=");
+            break;
+        case cloud_blob_comparison_operator::GREATER_THAN:
+            comparison_operator_string = _XPLATSTR(">");
+            break;
+        case cloud_blob_comparison_operator::GREATER_THAN_OR_EQUAL:
+            comparison_operator_string = _XPLATSTR(">=");
+            break;
+        case cloud_blob_comparison_operator::LESS_THAN:
+            comparison_operator_string = _XPLATSTR("<");
+            break;
+        case cloud_blob_comparison_operator::LESS_THAN_OR_EQUAL:
+            comparison_operator_string = _XPLATSTR("<=");
+            break;
+        }
+
+        return tag_key + _XPLATSTR(" ") + comparison_operator_string + _XPLATSTR(" '") + tag_value + _XPLATSTR("'");
+    }
+
+    utility::string_t cloud_blob_tag_query::generate_query(const utility::string_t& container_name)
+    {
+        return _XPLATSTR("@container='") + container_name + _XPLATSTR("'");
+    }
+
+
+    void cloud_blob_tag_query::append_query(utility::string_t& queries, cloud_blob_logical_operator logical_operator, const utility::string_t& query)
+    {
+        if (query.empty())
+        {
+            throw storage_exception(protocol::error_query_to_add_cannot_be_empty, false);
+        }
+        else if (queries.empty())
+        {
+            //avoid adding the logic operator if existing filters are empty set.
+            queries = query;
+        }
+        else
+        {
+            utility::string_t logical_operator_string;
+            switch (logical_operator)
+            {
+            case cloud_blob_logical_operator::AND:
+                logical_operator_string = _XPLATSTR("AND");
+                break;
+            case cloud_blob_logical_operator::OR:
+                logical_operator_string = _XPLATSTR("OR");
+                break;
+            }
+            queries.append(_XPLATSTR(" ") + logical_operator_string + _XPLATSTR(" ") + query);
+        }
+    }
+
     container_result_iterator cloud_blob_client::list_containers(const utility::string_t& prefix, container_listing_details::values includes, int max_results, const blob_request_options& options, operation_context context) const
     {
         auto instance = std::make_shared<cloud_blob_client>(*this);
@@ -220,6 +282,40 @@ namespace azure { namespace storage {
             command->set_request_body(request_body);
             return core::executor<user_delegation_key>::execute_async(command, modified_options, context);
         });
+    }
+
+    find_blob_item_iterator cloud_blob_client::find_blobs_with_tag_query(const utility::string_t& tag_query, int max_results, const blob_request_options& options, operation_context context) const
+    {
+        auto instance = std::make_shared<cloud_blob_client>(*this);
+        return find_blob_item_iterator(
+            [instance, tag_query, max_results, options, context](const continuation_token& token, size_t max_results_per_segment)
+            {
+                return instance->find_blobs_segmented_with_tag_query(tag_query, token, (int)max_results_per_segment, options, context);
+            },
+            max_results, 0);
+    }
+
+    pplx::task<find_blob_item_segment> cloud_blob_client::find_blobs_segmented_with_tag_query_async(const utility::string_t& tag_query, const continuation_token& token, int max_results, const blob_request_options& options, operation_context context, const pplx::cancellation_token& cancellation_token) const
+    {
+        blob_request_options modified_options(options);
+        modified_options.apply_defaults(this->default_request_options(), blob_type::unspecified);
+
+        auto command = std::make_shared<core::storage_command<find_blob_item_segment>>(base_uri(), cancellation_token, modified_options.is_maximum_execution_time_customized());
+        command->set_build_request(std::bind(protocol::find_blobs_by_tags, tag_query, max_results, token, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        command->set_authentication_handler(authentication_handler());
+        command->set_location_mode(core::command_location_mode::primary_or_secondary, token.target_location());
+        command->set_preprocess_response(std::bind(protocol::preprocess_response<find_blob_item_segment>, find_blob_item_segment(), std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        command->set_postprocess_response([](const web::http::http_response& response, const request_result& result, const core::ostream_descriptor&, operation_context context) -> pplx::task<find_blob_item_segment>
+            {
+                protocol::find_blobs_reader reader(response.body());
+
+                continuation_token next_token(reader.move_next_marker());
+                next_token.set_target_location(result.target_location());
+
+                return pplx::task_from_result(find_blob_item_segment(reader.move_items(), std::move(next_token)));
+            });
+
+        return core::executor<find_blob_item_segment>::execute_async(command, modified_options, context);
     }
 
 }} // namespace azure::storage

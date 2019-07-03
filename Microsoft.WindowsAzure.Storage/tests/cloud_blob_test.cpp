@@ -638,11 +638,11 @@ SUITE(Blob)
 
         azure::storage::blob_shared_access_policy policy;
         auto permissions = azure::storage::blob_shared_access_policy::read;
-        policy.set_permissions(permissions);
+        policy.set_permissions(static_cast<uint8_t>(permissions));
         policy.set_start(utility::datetime::utc_now() - utility::datetime::from_minutes(5));
         policy.set_expiry(utility::datetime::utc_now() + utility::datetime::from_minutes(30));
         auto sas_token = snapshot1.get_shared_access_signature(policy);
-        check_access(sas_token, permissions, azure::storage::cloud_blob_shared_access_headers(), snapshot1);
+        check_access(sas_token, static_cast<uint8_t>(permissions), azure::storage::cloud_blob_shared_access_headers(), snapshot1);
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
@@ -1214,5 +1214,163 @@ SUITE(Blob)
 
             CHECK_EQUAL("The client could not finish the operation within specified timeout.", ex_msg);
         }
+    }
+
+    TEST_FIXTURE(blob_test_base, blob_tag_put_blob)
+    {
+        {
+            auto blob_name = get_random_string(20);
+            auto blob = m_container.get_block_blob_reference(blob_name);
+            auto same_reference_blob = m_container.get_block_blob_reference(blob_name);
+            azure::storage::cloud_blob_tags tags;
+            tags[_XPLATSTR("tag_key1")] = _XPLATSTR("tag_value1");
+            tags[_XPLATSTR("tag_key2")] = _XPLATSTR("tag_value2");
+            tags[_XPLATSTR("tag_key3")] = _XPLATSTR("tag_value3");
+
+            blob.set_tags(tags);
+            blob.upload_text(_XPLATSTR("test"));
+
+            CHECK(blob.get_tags() != same_reference_blob.get_tags());
+            same_reference_blob.download_tags();
+            CHECK(blob.get_tags() == same_reference_blob.get_tags());
+        }
+
+        {
+            auto blob_name = get_random_string(20);
+            auto blob = m_container.get_page_blob_reference(blob_name);
+            auto same_reference_blob = m_container.get_page_blob_reference(blob_name);
+            azure::storage::cloud_blob_tags tags;
+            tags[_XPLATSTR("tag_key1")] = _XPLATSTR("tag_value1");
+            tags[_XPLATSTR("tag_key2")] = _XPLATSTR("tag_value2");
+            tags[_XPLATSTR("tag_key3")] = _XPLATSTR("tag_value3");
+
+            blob.set_tags(tags);
+            blob.create(1024U);
+
+            CHECK(blob.get_tags() != same_reference_blob.get_tags());
+            same_reference_blob.download_tags();
+            CHECK(blob.get_tags() == same_reference_blob.get_tags());
+        }
+
+        {
+            auto blob_name = get_random_string(20);
+            auto blob = m_container.get_append_blob_reference(blob_name);
+            auto same_reference_blob = m_container.get_append_blob_reference(blob_name);
+            azure::storage::cloud_blob_tags tags;
+            tags[_XPLATSTR("tag_key1")] = _XPLATSTR("tag_value1");
+            tags[_XPLATSTR("tag_key2")] = _XPLATSTR("tag_value2");
+            tags[_XPLATSTR("tag_key3")] = _XPLATSTR("tag_value3");
+
+            blob.set_tags(tags);
+            blob.create_or_replace();
+
+            CHECK(blob.get_tags() != same_reference_blob.get_tags());
+            same_reference_blob.download_tags();
+            CHECK(blob.get_tags() == same_reference_blob.get_tags());
+        }
+    }
+
+    TEST_FIXTURE(blob_test_base, blob_tag_read_write)
+    {
+        auto blob_name = get_random_string(20);
+        auto blob = m_container.get_block_blob_reference(blob_name);
+        auto same_reference_blob = m_container.get_block_blob_reference(blob_name);
+        blob.upload_text(_XPLATSTR("test"));
+
+        azure::storage::cloud_blob_tags tags;
+        tags[_XPLATSTR("tag_key1")] = _XPLATSTR("tag_value1");
+        tags[_XPLATSTR("tag_key2")] = _XPLATSTR("tag_value2");
+        tags[_XPLATSTR("tag_key3")] = _XPLATSTR("tag_value3");
+
+        blob.set_tags(tags);
+        blob.upload_tags();
+
+        CHECK(blob.get_tags() != same_reference_blob.get_tags());
+        same_reference_blob.download_tags();
+        CHECK(blob.get_tags() == same_reference_blob.get_tags());
+
+        tags[_XPLATSTR("tag_key4")] = _XPLATSTR("tag_value4");
+        tags[_XPLATSTR("tag_key5")] = _XPLATSTR("tag_value5");
+        tags[_XPLATSTR("tag_key6")] = _XPLATSTR("tag_value6");
+        tags[_XPLATSTR("tag_key7")] = _XPLATSTR("tag_value7");
+        tags[_XPLATSTR("tag_key8")] = _XPLATSTR("tag_value8");
+        tags[_XPLATSTR("tag_key9")] = _XPLATSTR("tag_value9");
+        tags[_XPLATSTR("tag_key10")] = _XPLATSTR("tag_value10");
+        tags[_XPLATSTR("tag_key11")] = _XPLATSTR("tag_value11");
+        blob.set_tags(tags);
+
+        CHECK_THROW(blob.upload_tags(), azure::storage::storage_exception);
+    }
+
+    TEST_FIXTURE(blob_test_base, blob_tag_read_write_conditional)
+    {
+        auto blob_name = get_random_string(20);
+        auto blob = m_container.get_block_blob_reference(blob_name);
+        auto same_reference_blob = m_container.get_block_blob_reference(blob_name);
+        blob.upload_text(_XPLATSTR("test"));
+
+        azure::storage::cloud_blob_tags tags;
+        tags[_XPLATSTR("tag_key1")] = _XPLATSTR("tag_value1");
+        tags[_XPLATSTR("tag_key2")] = _XPLATSTR("tag_value2");
+        tags[_XPLATSTR("tag_key3")] = _XPLATSTR("tag_value3");
+
+        blob.set_tags(tags);
+        blob.upload_tags();
+
+        CHECK(tags != same_reference_blob.get_tags());
+        same_reference_blob.download_tags();
+        CHECK(tags == same_reference_blob.get_tags());
+
+        {
+            auto query = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key1"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value1"));
+            auto condition = azure::storage::access_condition::generate_if_tags_condition(query);
+
+            CHECK_NOTHROW(blob.upload_tags(condition));
+        }
+
+        {
+            auto query = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key4"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value4"));
+            auto condition = azure::storage::access_condition::generate_if_tags_condition(query);
+            CHECK_THROW(blob.upload_tags(condition), azure::storage::storage_exception);
+
+        }
+
+        {
+            blob.set_tags(tags);
+            blob.upload_tags();
+
+            auto query = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key1"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value1"));
+            auto condition = azure::storage::access_condition::generate_if_tags_condition(query);
+            CHECK_NOTHROW(blob.download_tags(condition));
+        }
+
+        {
+
+            auto query = azure::storage::cloud_blob_tag_query::generate_query(_XPLATSTR("tag_key4"), azure::storage::cloud_blob_comparison_operator::EQUAL, _XPLATSTR("tag_value4"));
+            auto condition = azure::storage::access_condition::generate_if_tags_condition(query);
+
+            CHECK_THROW(blob.download_tags(condition), azure::storage::storage_exception);
+        }
+    }
+
+    TEST_FIXTURE(blob_test_base, blob_tag_snapshot_read)
+    {
+        auto blob_name = get_random_string(20);
+        auto blob = m_container.get_block_blob_reference(blob_name);
+        blob.upload_text(_XPLATSTR("test"));
+        auto snapshot_blob = blob.create_snapshot();
+
+        azure::storage::cloud_blob_tags tags;
+        tags[_XPLATSTR("tag_key1")] = _XPLATSTR("tag_value1");
+        tags[_XPLATSTR("tag_key2")] = _XPLATSTR("tag_value2");
+        tags[_XPLATSTR("tag_key3")] = _XPLATSTR("tag_value3");
+
+        blob.set_tags(tags);
+        blob.upload_tags();
+
+        CHECK(blob.get_tags() != snapshot_blob.get_tags());
+        snapshot_blob.download_tags();
+        CHECK(blob.get_tags() != snapshot_blob.get_tags());
+        CHECK(snapshot_blob.get_tags().empty());
     }
 }

@@ -169,6 +169,12 @@ namespace azure { namespace storage { namespace protocol {
             return;
         }
 
+        if (get_parent_element_name() == xml_tags)
+        {
+            m_tags[element_name] = get_current_element_text();
+            return;
+        }
+
         if (get_parent_element_name() == xml_properties)
         {
             if (element_name == xml_last_modified)
@@ -362,7 +368,7 @@ namespace azure { namespace storage { namespace protocol {
         {
             if (element_name == xml_blob)
             {
-                m_blob_items.push_back(cloud_blob_list_item(std::move(m_uri), std::move(m_name), std::move(m_snapshot_time), m_is_current_version, std::move(m_metadata), std::move(m_properties), std::move(m_copy_state)));
+                m_blob_items.push_back(cloud_blob_list_item(std::move(m_uri), std::move(m_name), std::move(m_snapshot_time), m_is_current_version, std::move(m_metadata), std::move(m_properties), std::move(m_copy_state), std::move(m_tags)));
                 m_uri = web::uri();
                 m_name = utility::string_t();
                 m_snapshot_time = utility::string_t();
@@ -1138,6 +1144,121 @@ namespace azure { namespace storage { namespace protocol {
         else if (element_name == xml_user_delegation_key_value)
         {
             extract_current_element(m_key.key);
+        }
+    }
+
+    std::string protocol::blob_tags_writer::write(const cloud_blob_tags & tags)
+    {
+        std::ostringstream outstream;
+        initialize(outstream);
+
+        write_start_element(xml_tags);
+        write_start_element(xml_tag_set);
+        
+        for each (auto tag in tags)
+        {
+            write_start_element(xml_tag);
+            write_element(xml_key, tag.first);
+            write_element(xml_value, tag.second);
+            write_end_element();
+        }
+
+        finalize();
+        return outstream.str();
+    }
+
+    void blob_tags_reader::handle_begin_element(const utility::string_t& element_name)
+    {
+        UNREFERENCED_PARAMETER(element_name);
+        //No need to handle the beginning element.
+    }
+
+    void blob_tags_reader::handle_element(const utility::string_t& element_name)
+    {
+        if (element_name == xml_key)
+        {
+            m_blob_tag_name = get_current_element_text();
+        }
+        else if (element_name == xml_value)
+        {
+            m_blob_tag_value = get_current_element_text();
+        }
+    }
+
+    void blob_tags_reader::handle_end_element(const utility::string_t& element_name)
+    {
+        if (element_name == xml_tag)
+        {
+            if (!(m_blob_tag_name.empty()) && !(m_blob_tag_value.empty()))
+            {
+                m_blob_tags.insert_or_assign(std::move(m_blob_tag_name), std::move(m_blob_tag_value));
+                m_blob_tag_name = utility::string_t();
+                m_blob_tag_value = utility::string_t();
+            }
+        }
+    }
+
+    void find_blobs_reader::handle_begin_element(const utility::string_t& element_name)
+    {
+        if (element_name == xml_enumeration_results)
+        {
+            if (move_to_first_attribute())
+            {
+                do
+                {
+                    if (get_current_element_name() == xml_service_endpoint)
+                    {
+                        m_service_uri = web::http::uri(get_current_element_text());
+                    }
+                } while (move_to_next_attribute());
+            }
+        }
+    }
+
+    void find_blobs_reader::handle_element(const utility::string_t& element_name)
+    {
+        if (element_name == xml_tag_value)
+        {
+            m_tag_value = get_current_element_text();
+            return;
+        }
+
+        if (element_name == xml_container_name)
+        {
+            m_container_name = get_current_element_text();
+            return;
+        }
+
+        if (element_name == xml_name)
+        {
+            m_name = get_current_element_text();
+            return;
+        }
+
+        if (element_name == xml_next_marker)
+        {
+            m_next_marker = get_current_element_text();
+            return;
+        }
+
+        if (element_name == xml_where)
+        {
+            m_where = get_current_element_text();
+            return;
+        }
+    }
+
+    void find_blobs_reader::handle_end_element(const utility::string_t& element_name)
+    {
+        if (get_parent_element_name() == xml_blobs)
+        {
+            if (element_name == xml_blob)
+            {
+                m_items.emplace_back(find_blob_item(std::move(m_name), std::move(m_container_name), std::move(m_tag_value)));
+                m_name = utility::string_t();
+                m_container_name = utility::string_t();
+                m_tag_value = utility::string_t();
+            }
         }
     }
 

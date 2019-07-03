@@ -298,7 +298,7 @@ namespace azure { namespace storage { namespace protocol {
         return request;
     }
 
-    web::http::http_request put_block_list(const cloud_blob_properties& properties, const cloud_metadata& metadata, const checksum& content_checksum, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
+    web::http::http_request put_block_list(const cloud_blob_properties& properties, const cloud_metadata& metadata, const cloud_blob_tags& tags, const checksum& content_checksum, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
     {
         uri_builder.append_query(core::make_query_parameter(uri_query_component, component_block_list, /* do_encoding */ false));
         web::http::http_request request(base_request(web::http::methods::PUT, uri_builder, timeout, context));
@@ -314,6 +314,7 @@ namespace azure { namespace storage { namespace protocol {
         add_metadata(request, metadata);
         add_access_condition(request, condition);
         add_encryption_key(request, options.encryption_key());
+        add_tags_in_header(request, tags);
         return request;
     }
 
@@ -421,13 +422,14 @@ namespace azure { namespace storage { namespace protocol {
         return request;
     }
 
-    web::http::http_request put_block_blob(const checksum& content_checksum, const cloud_blob_properties& properties, const cloud_metadata& metadata, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
+    web::http::http_request put_block_blob(const checksum& content_checksum, const cloud_blob_properties& properties, const cloud_metadata& metadata, const cloud_blob_tags& tags, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
     {
         web::http::http_request request(base_request(web::http::methods::PUT, uri_builder, timeout, context));
         request.headers().add(ms_header_blob_type, header_value_blob_type_block);
         add_properties(request, properties);
         add_metadata(request, metadata);
         add_access_condition(request, condition);
+        add_tags_in_header(request, tags);
         if (content_checksum.is_crc64())
         {
             request.headers().add(ms_header_content_crc64, content_checksum.crc64());
@@ -436,7 +438,7 @@ namespace azure { namespace storage { namespace protocol {
         return request;
     }
 
-    web::http::http_request put_page_blob(utility::size64_t size, const utility::string_t& tier, int64_t sequence_number, const cloud_blob_properties& properties, const cloud_metadata& metadata, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
+    web::http::http_request put_page_blob(utility::size64_t size, const utility::string_t& tier, int64_t sequence_number, const cloud_blob_properties& properties, const cloud_metadata& metadata, const cloud_blob_tags& tags, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
     {
         web::http::http_request request(base_request(web::http::methods::PUT, uri_builder, timeout, context));
         web::http::http_headers& headers = request.headers();
@@ -451,10 +453,11 @@ namespace azure { namespace storage { namespace protocol {
         add_metadata(request, metadata);
         add_access_condition(request, condition);
         add_encryption_key(request, options.encryption_key());
+        add_tags_in_header(request, tags);
         return request;
     }
 
-    web::http::http_request put_append_blob(const cloud_blob_properties& properties, const cloud_metadata& metadata, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
+    web::http::http_request put_append_blob(const cloud_blob_properties& properties, const cloud_metadata& metadata, const cloud_blob_tags& tags, const access_condition& condition, const blob_request_options& options, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
     {
         web::http::http_request request(base_request(web::http::methods::PUT, uri_builder, timeout, context));
         request.headers().add(ms_header_blob_type, header_value_blob_type_append);
@@ -462,6 +465,7 @@ namespace azure { namespace storage { namespace protocol {
         add_metadata(request, metadata);
         add_access_condition(request, condition);
         add_encryption_key(request, options.encryption_key());
+        add_tags_in_header(request, tags);
         return request;
     }
 
@@ -583,7 +587,7 @@ namespace azure { namespace storage { namespace protocol {
         return request;
     }
 
-    web::http::http_request copy_blob(const web::http::uri& source, const utility::string_t& tier, const access_condition& source_condition, const cloud_metadata& metadata, const access_condition& condition, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
+    web::http::http_request copy_blob(const web::http::uri& source, const utility::string_t& tier, const access_condition& source_condition, const cloud_metadata& metadata, const cloud_blob_tags& tags, const access_condition& condition, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
     {
         web::http::http_request request(base_request(web::http::methods::PUT, uri_builder, timeout, context));
         request.headers().add(ms_header_copy_source, source.to_string());
@@ -594,6 +598,7 @@ namespace azure { namespace storage { namespace protocol {
         add_source_access_condition(request, source_condition);
         add_access_condition(request, condition);
         add_metadata(request, metadata);
+        add_tags_in_header(request, tags);
         return request;
     }
 
@@ -636,6 +641,53 @@ namespace azure { namespace storage { namespace protocol {
         return request;
     }
 
+    web::http::http_request find_blobs_by_tags(const utility::string_t& expression, int max_results, const continuation_token& token, web::http::uri_builder& uri_builder, const std::chrono::seconds& timeout, operation_context context)
+    {
+        uri_builder.append_query(core::make_query_parameter(uri_query_component, component_blobs, /* do_encoding */ false));
+        uri_builder.append_query(core::make_query_parameter(uri_query_where, expression, /* do_encoding */ true));
+
+        if (!token.empty())
+        {
+            uri_builder.append_query(core::make_query_parameter(uri_query_marker, token.next_marker()));
+        }
+
+        if (max_results > 0)
+        {
+            uri_builder.append_query(core::make_query_parameter(uri_query_max_results, max_results, /* do_encoding */ false));
+        }
+
+        web::http::http_request request(base_request(web::http::methods::GET, uri_builder, timeout, context));
+
+        return request;
+    }
+
+    web::http::http_request set_blob_tags(const access_condition& access_condition, web::http::uri_builder & uri_builder, const std::chrono::seconds & timeout, operation_context context)
+    {
+        uri_builder.append_query(core::make_query_parameter(uri_query_component, component_tags, /* do_encoding */ false));
+        web::http::http_request request(base_request(web::http::methods::PUT, uri_builder, timeout, context));
+        add_optional_header(request.headers(), ms_header_if_tags, access_condition.if_tags());
+        return request;
+    }
+
+    web::http::http_request get_blob_tags(const utility::string_t& snapshot, const utility::string_t& blob_version_id, const access_condition& access_condition, web::http::uri_builder & uri_builder, const std::chrono::seconds & timeout, operation_context context)
+    {
+        uri_builder.append_query(core::make_query_parameter(uri_query_component, component_tags, /* do_encoding */ false));
+
+        if (!blob_version_id.empty())
+        {
+            uri_builder.append_query(core::make_query_parameter(component_blob_version_id, blob_version_id, /* do_encoding */ false));
+        }
+
+        if (!snapshot.empty())
+        {
+            uri_builder.append_query(core::make_query_parameter(component_snapshot, snapshot, /* do_encoding */ false));
+        }
+
+        web::http::http_request request(base_request(web::http::methods::GET, uri_builder, timeout, context));
+        add_optional_header(request.headers(), ms_header_if_tags, access_condition.if_tags());
+        return request;
+    }
+
     void add_lease_id(web::http::http_request& request, const access_condition& condition)
     {
         add_optional_header(request.headers(), ms_header_lease_id, condition.lease_id());
@@ -665,6 +717,7 @@ namespace azure { namespace storage { namespace protocol {
 
         add_optional_header(headers, web::http::header_names::if_match, condition.if_match_etag());
         add_optional_header(headers, web::http::header_names::if_none_match, condition.if_none_match_etag());
+        add_optional_header(headers, ms_header_if_tags, condition.if_tags());
 
         if (condition.if_modified_since_time().is_initialized())
         {
@@ -685,6 +738,7 @@ namespace azure { namespace storage { namespace protocol {
 
         add_optional_header(headers, ms_header_source_if_match, condition.if_match_etag());
         add_optional_header(headers, ms_header_source_if_none_match, condition.if_none_match_etag());
+        add_optional_header(headers, ms_header_source_if_tags, condition.if_tags());
 
         if (condition.if_modified_since_time().is_initialized())
         {
@@ -712,6 +766,26 @@ namespace azure { namespace storage { namespace protocol {
         if (condition.append_position() != -1)
         {
             request.headers().add(ms_header_blob_condition_appendpos, condition.append_position());
+        }
+    }
+
+    void add_tags_in_header(web::http::http_request& request, const cloud_blob_tags& tags)
+    {
+        if (tags.is_set())
+        {
+            utility::string_t header_value;
+            for each (auto tag_set in tags)
+            {
+                header_value.append(tag_set.first + query_equal_sign + tag_set.second + query_and_sign);
+            }
+
+            if (!header_value.empty())
+            {
+                // remove the redundant '&' at the end.
+                header_value.pop_back();
+
+                request.headers().add(ms_header_tags, web::http::uri::encode_uri(header_value));
+            }
         }
     }
 

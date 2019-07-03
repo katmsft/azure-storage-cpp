@@ -151,8 +151,8 @@ namespace azure { namespace storage { namespace protocol {
     {
     public:
 
-        cloud_blob_list_item(web::http::uri uri, utility::string_t name, utility::string_t snapshot_time, bool is_current_version, cloud_metadata metadata, cloud_blob_properties properties, copy_state copy_state)
-            : m_uri(std::move(uri)), m_name(std::move(name)), m_snapshot_time(std::move(snapshot_time)), m_is_current_version(is_current_version), m_metadata(std::move(metadata)), m_properties(std::move(properties)), m_copy_state(std::move(copy_state))
+        cloud_blob_list_item(web::http::uri uri, utility::string_t name, utility::string_t snapshot_time, bool is_current_version, cloud_metadata metadata, cloud_blob_properties properties, copy_state copy_state, cloud_blob_tags blob_tags)
+            : m_uri(std::move(uri)), m_name(std::move(name)), m_snapshot_time(std::move(snapshot_time)), m_is_current_version(is_current_version), m_metadata(std::move(metadata)), m_properties(std::move(properties)), m_copy_state(std::move(copy_state)), m_tags(std::move(blob_tags))
         {
         }
 
@@ -191,6 +191,11 @@ namespace azure { namespace storage { namespace protocol {
             return std::move(m_copy_state);
         }
 
+        cloud_blob_tags move_tags()
+        {
+            return std::move(m_tags);
+        }
+
     private:
 
         web::http::uri m_uri;
@@ -199,6 +204,7 @@ namespace azure { namespace storage { namespace protocol {
         bool m_is_current_version;
         cloud_metadata m_metadata;
         cloud_blob_properties m_properties;
+        cloud_blob_tags m_tags;
         azure::storage::copy_state m_copy_state;
     };
 
@@ -283,6 +289,7 @@ namespace azure { namespace storage { namespace protocol {
         bool m_is_current_version = false;
         cloud_metadata m_metadata;
         cloud_blob_properties m_properties;
+        cloud_blob_tags m_tags;
         copy_state m_copy_state;
     };
 
@@ -704,6 +711,13 @@ namespace azure { namespace storage { namespace protocol {
         cloud_file_share_properties m_properties;
     };
 
+    class blob_tags_writer : public core::xml::xml_writer
+    {
+    public:
+        blob_tags_writer() {}
+        std::string write(const cloud_blob_tags& tags);
+    };
+
     class get_share_stats_reader : public core::xml::xml_reader
     {
     public:
@@ -730,6 +744,60 @@ namespace azure { namespace storage { namespace protocol {
         virtual void handle_end_element(const utility::string_t& element_name);
 
         int64_t m_quota;
+    };
+
+    class find_blobs_reader : public core::xml::xml_reader
+    {
+    public:
+
+        explicit find_blobs_reader(concurrency::streams::istream stream)
+            : xml_reader(stream)
+        {
+        }
+
+        std::vector<find_blob_item> move_items()
+        {
+            auto result = parse();
+            if (result == xml_reader::parse_result::xml_not_complete)
+            {
+                throw storage_exception(protocol::error_xml_not_complete, true);
+            }
+            return std::move(m_items);
+        }
+
+        utility::string_t move_next_marker()
+        {
+            auto result = parse();
+            if (result == xml_reader::parse_result::xml_not_complete)
+            {
+                throw storage_exception(protocol::error_xml_not_complete, true);
+            }
+            return std::move(m_next_marker);
+        }
+
+        utility::string_t move_where()
+        {
+            auto result = parse();
+            if (result == xml_reader::parse_result::xml_not_complete)
+            {
+                throw storage_exception(protocol::error_xml_not_complete, true);
+            }
+            return std::move(m_where);
+        }
+
+    protected:
+
+        virtual void handle_begin_element(const utility::string_t& element_name);
+        virtual void handle_element(const utility::string_t& element_name);
+        virtual void handle_end_element(const utility::string_t& element_name);
+
+        std::vector<find_blob_item> m_items;
+        utility::string_t m_next_marker;
+        utility::string_t m_where;
+        web::http::uri m_service_uri;
+        utility::string_t m_name;
+        utility::string_t m_container_name;
+        utility::string_t m_tag_value;
     };
 
     class list_shares_reader : public core::xml::xml_reader
@@ -970,6 +1038,37 @@ namespace azure { namespace storage { namespace protocol {
         void handle_element(const utility::string_t& element_name) override;
 
         user_delegation_key m_key;
+    };
+
+    class blob_tags_reader : public core::xml::xml_reader
+    {
+    public:
+
+        explicit blob_tags_reader(concurrency::streams::istream stream)
+            : xml_reader(stream), m_blob_tag_name(utility::string_t()), m_blob_tag_value(utility::string_t())
+        {
+        }
+
+        // Extracts the result. This method can only be called once on this reader
+        cloud_blob_tags move_result()
+        {
+            auto result = parse();
+            if (result == xml_reader::parse_result::xml_not_complete)
+            {
+                throw storage_exception(protocol::error_xml_not_complete, true);
+            }
+            return std::move(m_blob_tags);
+        }
+
+    protected:
+
+        virtual void handle_begin_element(const utility::string_t& element_name);
+        virtual void handle_element(const utility::string_t& element_name);
+        virtual void handle_end_element(const utility::string_t& element_name);
+
+        utility::string_t m_blob_tag_name;
+        utility::string_t m_blob_tag_value;
+        cloud_blob_tags m_blob_tags;
     };
 
 }}} // namespace azure::storage::protocol

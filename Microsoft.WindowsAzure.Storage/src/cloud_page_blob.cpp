@@ -190,7 +190,7 @@ namespace azure { namespace storage {
         auto properties = m_properties;
 
         auto command = std::make_shared<core::storage_command<void>>(uri(), cancellation_token, modified_options.is_maximum_execution_time_customized());
-        command->set_build_request(std::bind(protocol::put_page_blob, size, get_premium_access_tier_string(tier), sequence_number, *properties, metadata(), condition, modified_options, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        command->set_build_request(std::bind(protocol::put_page_blob, size, get_premium_access_tier_string(tier), sequence_number, *properties, metadata(), m_tags, condition, modified_options, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
         command->set_authentication_handler(service_client().authentication_handler());
         command->set_preprocess_response([properties, size, tier](const web::http::http_response& response, const request_result& result, operation_context context)
         {

@@ -26,26 +26,34 @@
 #include "wascore/blobstreams.h"
 #include "wascore/util.h"
 #include "wascore/async_semaphore.h"
+#include "wascore/protocol_xml.h"
 
 namespace azure { namespace storage {
 
     cloud_blob::cloud_blob(storage_uri uri)
         : m_uri(std::move(uri)), m_metadata(std::make_shared<cloud_metadata>()), m_properties(std::make_shared<cloud_blob_properties>()),
-        m_copy_state(std::make_shared<azure::storage::copy_state>())
+        m_copy_state(std::make_shared<azure::storage::copy_state>()), m_tags(cloud_blob_tags::none())
     {
         init(utility::string_t(), storage_credentials());
     }
 
     cloud_blob::cloud_blob(storage_uri uri, storage_credentials credentials)
         : m_uri(std::move(uri)), m_metadata(std::make_shared<cloud_metadata>()), m_properties(std::make_shared<cloud_blob_properties>()),
-        m_copy_state(std::make_shared<azure::storage::copy_state>())
+        m_copy_state(std::make_shared<azure::storage::copy_state>()), m_tags(cloud_blob_tags::none())
     {
         init(utility::string_t(), std::move(credentials));
     }
 
     cloud_blob::cloud_blob(storage_uri uri, utility::string_t snapshot_time, storage_credentials credentials)
         : m_uri(std::move(uri)), m_metadata(std::make_shared<cloud_metadata>()), m_properties(std::make_shared<cloud_blob_properties>()),
-        m_copy_state(std::make_shared<azure::storage::copy_state>())
+        m_copy_state(std::make_shared<azure::storage::copy_state>()), m_tags(cloud_blob_tags::none())
+    {
+        init(std::move(snapshot_time), std::move(credentials));
+    }
+
+    cloud_blob::cloud_blob(storage_uri uri, utility::string_t snapshot_time, storage_credentials credentials, cloud_blob_tags tags)
+        : m_uri(std::move(uri)), m_metadata(std::make_shared<cloud_metadata>()), m_properties(std::make_shared<cloud_blob_properties>()),
+        m_copy_state(std::make_shared<azure::storage::copy_state>()), m_tags(std::move(tags))
     {
         init(std::move(snapshot_time), std::move(credentials));
     }
@@ -53,14 +61,14 @@ namespace azure { namespace storage {
     cloud_blob::cloud_blob(utility::string_t name, utility::string_t snapshot_time, cloud_blob_container container)
         : m_name(std::move(name)), m_snapshot_time(std::move(snapshot_time)), m_container(std::move(container)), m_uri(core::append_path_to_uri(m_container.uri(), m_name)),
         m_metadata(std::make_shared<cloud_metadata>()), m_properties(std::make_shared<cloud_blob_properties>()),
-        m_copy_state(std::make_shared<azure::storage::copy_state>())
+        m_copy_state(std::make_shared<azure::storage::copy_state>()), m_tags(cloud_blob_tags::none())
     {
     }
 
-    cloud_blob::cloud_blob(utility::string_t name, utility::string_t snapshot_time, cloud_blob_container container, cloud_blob_properties properties, cloud_metadata metadata, azure::storage::copy_state copy_state)
+    cloud_blob::cloud_blob(utility::string_t name, utility::string_t snapshot_time, cloud_blob_container container, cloud_blob_properties properties, cloud_metadata metadata, azure::storage::copy_state copy_state, cloud_blob_tags tags)
         : m_name(std::move(name)), m_snapshot_time(std::move(snapshot_time)), m_container(std::move(container)), m_uri(core::append_path_to_uri(m_container.uri(), m_name)),
         m_metadata(std::make_shared<cloud_metadata>(std::move(metadata))), m_properties(std::make_shared<cloud_blob_properties>(std::move(properties))),
-        m_copy_state(std::make_shared<azure::storage::copy_state>(std::move(copy_state)))
+        m_copy_state(std::make_shared<azure::storage::copy_state>(std::move(copy_state))), m_tags(std::move(tags))
     {
     }
 
@@ -949,7 +957,7 @@ namespace azure { namespace storage {
         auto copy_state = m_copy_state;
 
         auto command = std::make_shared<core::storage_command<utility::string_t>>(uri(), cancellation_token, modified_options.is_maximum_execution_time_customized());
-        command->set_build_request(std::bind(protocol::copy_blob, source, get_premium_access_tier_string(tier), source_condition, metadata, destination_condition, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        command->set_build_request(std::bind(protocol::copy_blob, source, get_premium_access_tier_string(tier), source_condition, metadata, m_tags, destination_condition, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
         command->set_authentication_handler(service_client().authentication_handler());
         command->set_preprocess_response([properties, copy_state, tier](const web::http::http_response& response, const request_result& result, operation_context context) -> utility::string_t
         {
@@ -1013,7 +1021,7 @@ namespace azure { namespace storage {
         auto command = std::make_shared<core::storage_command<cloud_blob>>(uri(), cancellation_token, modified_options.is_maximum_execution_time_customized());
         command->set_build_request(std::bind(protocol::snapshot_blob, *snapshot_metadata, condition, modified_options, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
         command->set_authentication_handler(service_client().authentication_handler());
-        command->set_preprocess_response([snapshot_name, snapshot_container, resulting_metadata, properties](const web::http::http_response& response, const request_result& result, operation_context context) -> cloud_blob
+        command->set_preprocess_response([snapshot_name, snapshot_container, resulting_metadata, properties, this](const web::http::http_response& response, const request_result& result, operation_context context) -> cloud_blob
         {
             protocol::preprocess_response_void(response, result, context);
             auto snapshot_time = protocol::get_header_value(response, protocol::ms_header_snapshot);
@@ -1022,9 +1030,58 @@ namespace azure { namespace storage {
             snapshot.m_properties->copy_from_root(*properties);
             snapshot.m_properties->update_etag_and_last_modified(protocol::blob_response_parsers::parse_blob_properties(response));
             properties->update_etag_and_last_modified(protocol::blob_response_parsers::parse_blob_properties(response));
+            snapshot.m_tags = this->m_tags;
             return snapshot;
         });
         return core::executor<cloud_blob>::execute_async(command, modified_options, context);
+    }
+
+    pplx::task<void> cloud_blob::upload_tags_async(const access_condition& condition, const blob_request_options & options, operation_context context, const pplx::cancellation_token & cancellation_token)
+    {
+        assert_no_snapshot();
+        blob_request_options modified_options(options);
+        modified_options.apply_defaults(service_client().default_request_options(), blob_type::unspecified);
+
+        protocol::blob_tags_writer writer;
+        concurrency::streams::istream stream(concurrency::streams::bytestream::open_istream(writer.write(m_tags)));
+
+        auto command = std::make_shared<core::storage_command<void>>(uri(), cancellation_token, modified_options.is_maximum_execution_time_customized());
+        command->set_build_request(std::bind(protocol::set_blob_tags, condition, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        command->set_authentication_handler(service_client().authentication_handler());
+        command->set_preprocess_response([](const web::http::http_response& response, const request_result& result, operation_context context)
+        {
+            protocol::preprocess_response_void(response, result, context);
+        });
+
+        return core::istream_descriptor::create(stream, checksum_type::none, std::numeric_limits<utility::size64_t>::max(), std::numeric_limits<utility::size64_t>::max(), command->get_cancellation_token()).then([command, context, modified_options, cancellation_token, options](core::istream_descriptor request_body) -> pplx::task<void>
+        {
+            command->set_request_body(request_body);
+            return core::executor<void>::execute_async(command, modified_options, context);
+        });
+    }
+
+    pplx::task<void> cloud_blob::download_tags_async_impl(const utility::string_t& snapshot, const utility::string_t& blob_version_id, const access_condition& condition, const blob_request_options & options, operation_context context, const pplx::cancellation_token & cancellation_token)
+    {
+        if (!(snapshot.empty() || blob_version_id.empty()))
+        {
+            throw std::logic_error(protocol::error_get_tag_conflict_snapshot_version_id);
+        }
+        blob_request_options modified_options(options);
+        modified_options.apply_defaults(service_client().default_request_options(), blob_type::unspecified);
+
+
+        auto command = std::make_shared<core::storage_command<void>>(uri(), cancellation_token, modified_options.is_maximum_execution_time_customized());
+        command->set_build_request(std::bind(protocol::get_blob_tags, snapshot, blob_version_id, condition, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+        command->set_authentication_handler(service_client().authentication_handler());
+        command->set_location_mode(core::command_location_mode::primary_or_secondary);
+        command->set_preprocess_response([this](const web::http::http_response& response, const request_result& result, operation_context context)
+        {
+            protocol::preprocess_response_void(response, result, context);
+            protocol::blob_tags_reader reader(response.body());
+            this->m_tags = reader.move_result();
+        });
+
+        return core::executor<void>::execute_async(command, modified_options, context);
     }
 
     void cloud_blob::assert_no_snapshot() const

@@ -84,7 +84,7 @@ namespace azure { namespace storage {
         });
         return core::istream_descriptor::create(stream, needs_checksum, std::numeric_limits<utility::size64_t>::max(), std::numeric_limits<utility::size64_t>::max(), command->get_cancellation_token()).then([command, properties, this, context, modified_options, condition](core::istream_descriptor request_body) -> pplx::task<void>
         {
-            command->set_build_request(std::bind(protocol::put_block_list, *properties, metadata(), request_body.content_checksum(), condition, modified_options, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+            command->set_build_request(std::bind(protocol::put_block_list, *properties, metadata(), m_tags, request_body.content_checksum(), condition, modified_options, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
             command->set_request_body(request_body);
             return core::executor<void>::execute_async(command, modified_options, context);
         });
@@ -212,7 +212,7 @@ namespace azure { namespace storage {
                 need_checksum = checksum_type::crc64;
             }
 
-            return core::istream_descriptor::create(source, need_checksum, length, protocol::max_single_blob_upload_threshold, command->get_cancellation_token()).then([command, context, properties, metadata, condition, modified_options](core::istream_descriptor request_body) -> pplx::task<void>
+            return core::istream_descriptor::create(source, need_checksum, length, protocol::max_single_blob_upload_threshold, command->get_cancellation_token()).then([command, context, properties, metadata, condition, modified_options, this](core::istream_descriptor request_body) -> pplx::task<void>
             {
                 if (request_body.content_checksum().is_md5())
                 {
@@ -224,7 +224,7 @@ namespace azure { namespace storage {
                     content_checksum = request_body.content_checksum();
                 }
 
-                command->set_build_request(std::bind(protocol::put_block_blob, content_checksum, *properties, *metadata, condition, modified_options, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+                command->set_build_request(std::bind(protocol::put_block_blob, content_checksum, *properties, *metadata, this->m_tags, condition, modified_options, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
                 command->set_request_body(request_body);
                 return core::executor<void>::execute_async(command, modified_options, context);
             });
