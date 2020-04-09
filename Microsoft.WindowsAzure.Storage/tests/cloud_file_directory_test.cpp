@@ -237,6 +237,7 @@ SUITE(File)
                             CHECK(file.metadata().empty());
                             CHECK(file.properties().etag().empty());
                             CHECK(!file.properties().last_modified().is_initialized());
+                            CHECK_EQUAL(512U, file.properties().length());
 
                             for (auto file_name = files_three.begin(); file_name != files_three.end(); file_name++)
                             {
@@ -258,6 +259,7 @@ SUITE(File)
                         CHECK(file.metadata().empty());
                         CHECK(file.properties().etag().empty());
                         CHECK(!file.properties().last_modified().is_initialized());
+                        CHECK_EQUAL(512U, file.properties().length());
 
                         for (auto file_name = files_two.begin(); file_name != files_two.end(); file_name++)
                         {
@@ -282,6 +284,7 @@ SUITE(File)
                 CHECK(file.metadata().empty());
                 CHECK(file.properties().etag().empty());
                 CHECK(!file.properties().last_modified().is_initialized());
+                CHECK_EQUAL(512U, file.properties().length());
 
                 for (auto file_name = files_one.begin(); file_name != files_one.end(); file_name++)
                 {
@@ -322,8 +325,8 @@ SUITE(File)
             m_directory.get_subdirectory_reference(exclude_prefix + azure::storage::core::convert_to_string(i)).create();
         }
 
-        int num_items_expected = directories.size() + files.size();
-        int num_items_actual = 0;
+        size_t num_items_expected = directories.size() + files.size();
+        size_t num_items_actual = 0;
         for (auto&& item : m_directory.list_files_and_directories(prefix))
         {
             ++num_items_actual;
