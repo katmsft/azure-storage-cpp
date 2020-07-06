@@ -290,6 +290,8 @@ namespace azure { namespace storage { namespace protocol {
         cloud_metadata m_metadata;
         cloud_blob_properties m_properties;
         cloud_blob_tags m_tags;
+        utility::string_t m_tag_key;
+        utility::string_t m_tag_value;
         copy_state m_copy_state;
     };
 

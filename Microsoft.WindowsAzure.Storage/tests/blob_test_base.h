@@ -18,7 +18,7 @@
 #pragma once
 
 #include <iomanip>
-#include "CurrentTest.h"
+#include "Unittest++/CurrentTest.h"
 
 #include "cpprest/filestream.h"
 

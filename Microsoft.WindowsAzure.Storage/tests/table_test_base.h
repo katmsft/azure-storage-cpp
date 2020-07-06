@@ -18,7 +18,7 @@
 #pragma once
 
 #include <iomanip>
-#include "CurrentTest.h"
+#include "Unittest++/CurrentTest.h"
 
 #include "test_base.h"
 #include "was/table.h"

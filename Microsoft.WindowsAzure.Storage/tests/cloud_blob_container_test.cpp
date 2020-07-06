@@ -232,6 +232,11 @@ SUITE(Blob)
         check_container_no_stale_property(m_container);
         std::map<utility::string_t, azure::storage::cloud_blob> blobs;
 
+        azure::storage::cloud_blob_tags tags;
+        tags[_XPLATSTR("tag_key1")] = _XPLATSTR("tag_value1");
+        tags[_XPLATSTR("tag_key2")] = _XPLATSTR("tag_value2");
+        tags[_XPLATSTR("tag_key3")] = _XPLATSTR("tag_value3");
+
         for (int i = 0; i < 4; i++)
         {
             auto index = azure::storage::core::convert_to_string(i);
@@ -241,6 +246,7 @@ SUITE(Blob)
             std::vector<uint8_t> buffer;
             buffer.resize(i * 16 * 1024);
             auto stream = concurrency::streams::container_stream<std::vector<uint8_t>>::open_istream(buffer);
+            blob.set_tags(tags);
             blob.upload_from_stream(stream, azure::storage::access_condition(), azure::storage::blob_request_options(), m_context);
             blobs[blob.name()] = blob;
         }
@@ -251,6 +257,7 @@ SUITE(Blob)
             auto blob = m_container.get_page_blob_reference(_XPLATSTR("pageblob") + index);
             blob.metadata()[_XPLATSTR("index")] = index;
             
+            blob.set_tags(tags);
             blob.create(i * 512, 0, azure::storage::access_condition(), azure::storage::blob_request_options(), m_context);
             check_container_no_stale_property(m_container);
             blobs[blob.name()] = blob;
@@ -262,6 +269,7 @@ SUITE(Blob)
             auto blob = m_container.get_append_blob_reference(_XPLATSTR("appendblob") + index);
             blob.metadata()[_XPLATSTR("index")] = index;
 
+            blob.set_tags(tags);
             blob.create_or_replace(azure::storage::access_condition(), azure::storage::blob_request_options(), m_context);
             check_container_no_stale_property(m_container);
 
@@ -273,7 +281,7 @@ SUITE(Blob)
             blobs[blob.name()] = blob;
         }
 
-        auto listing1 = list_all_blobs(utility::string_t(), azure::storage::blob_listing_details::all, 0, azure::storage::blob_request_options());
+        auto listing1 = list_all_blobs(utility::string_t(), static_cast<azure::storage::blob_listing_details::values>(azure::storage::blob_listing_details::all | azure::storage::blob_listing_details::tags), 0, azure::storage::blob_request_options());
         for (auto iter = listing1.begin(); iter != listing1.end(); ++iter)
         {
             auto blob = blobs.find(iter->name());
@@ -283,6 +291,7 @@ SUITE(Blob)
             CHECK_UTF8_EQUAL(blob->second.uri().secondary_uri().to_string(), iter->uri().secondary_uri().to_string());
 
             auto index_str = blob->second.metadata().find(_XPLATSTR("index"));
+            CHECK(tags == iter->get_tags());
             CHECK(index_str != blob->second.metadata().end());
             auto index = utility::conversions::details::scan_string<int>(index_str->second);
 

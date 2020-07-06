@@ -360,6 +360,11 @@ namespace azure { namespace storage {
             versions = 1 << 4,
 
             /// <summary>
+            /// Include saved tags of blobs.
+            /// <summary>
+            tags = 1 << 5,
+
+            /// <summary>
             /// List all available committed blobs, uncommitted blobs, and snapshots, and return all metadata and copy status for those blobs.
             /// </summary>
             all = snapshots | metadata | uncommitted_blobs | copy

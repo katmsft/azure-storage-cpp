@@ -169,9 +169,18 @@ namespace azure { namespace storage { namespace protocol {
             return;
         }
 
-        if (get_parent_element_name() == xml_tags)
+        if (get_parent_element_name() == xml_tag)
         {
-            m_tags[element_name] = get_current_element_text();
+            if (element_name == xml_key)
+            {
+                m_tag_key = get_current_element_text();
+                return;
+            }
+            if (element_name == xml_value)
+            {
+                m_tag_value = get_current_element_text();
+                return;
+            }
             return;
         }
 
@@ -364,6 +373,16 @@ namespace azure { namespace storage { namespace protocol {
 
     void list_blobs_reader::handle_end_element(const utility::string_t& element_name)
     {
+        if (get_parent_element_name() == xml_tag)
+        {
+            if ((!m_tag_key.empty()) && (!m_tag_value.empty()))
+            {
+                m_tags.insert_or_assign(std::move(m_tag_key), std::move(m_tag_value));
+                m_tag_key = utility::string_t();
+                m_tag_value = utility::string_t();
+            }
+        }
+
         if (get_parent_element_name() == xml_blobs)
         {
             if (element_name == xml_blob)
@@ -376,6 +395,7 @@ namespace azure { namespace storage { namespace protocol {
                 m_metadata = azure::storage::cloud_metadata();
                 m_properties = azure::storage::cloud_blob_properties();
                 m_copy_state = azure::storage::copy_state();
+                m_tags.clear();
             }
             else if (element_name == xml_blob_prefix)
             {

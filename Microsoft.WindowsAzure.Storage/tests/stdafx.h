@@ -27,8 +27,8 @@
 // This is required to support enough number of arguments in VC11, especially for std::bind
 #define _VARIADIC_MAX 8
 
-#include "UnitTest++.h"
-#include "TestReporterStdout.h"
+#include "UnitTest++/UnitTest++.h"
+#include "UnitTest++/TestReporterStdout.h"
 
 #include <thread>
 #include <math.h>
